@@ -657,23 +657,28 @@ body {
   justify-content: space-between;
   align-items: center;
   margin-bottom: var(--spacing-lg);
+  gap: var(--spacing-md);
 }
 
 .pool-header h2 {
   font-size: 1.125rem;
   font-weight: 600;
+  flex: 1;
 }
 
 .add-liquidity-button {
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-radius: var(--radius-md);
+  width: auto;
+  max-width: 140px;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
   border: none;
   background: var(--color-primary);
   color: white;
-  font-weight: 600;
-  font-size: 0.875rem;
+  font-weight: 500;
+  font-size: 0.8rem;
   cursor: pointer;
   transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
 .add-liquidity-button:hover {
