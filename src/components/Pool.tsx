@@ -160,7 +160,7 @@ export function Pool() {
               poolAddress="0x8703324e56B0724158bdd0B25251fFb5D3343Aba"
               token0={TOKENS.WATN}
               token1={TOKENS.USDC}
-              fee={3000}
+              fee={500}
               onAddLiquidity={() => setShowAddLiquidity(true)}
             />
           </div>

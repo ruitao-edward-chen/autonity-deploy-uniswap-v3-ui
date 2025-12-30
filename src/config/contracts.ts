@@ -41,7 +41,7 @@ export const POOLS = {
     address: '0x8703324e56B0724158bdd0B25251fFb5D3343Aba' as const,
     token0: TOKENS.WATN,
     token1: TOKENS.USDC,
-    fee: 3000, // 0.3%
+    fee: 500, // 0.05%
   },
 }
 
