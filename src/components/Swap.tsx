@@ -1,14 +1,15 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useBalance, usePublicClient } from 'wagmi'
 import { parseUnits, formatUnits, encodeFunctionData } from 'viem'
 import { TokenInput } from './TokenInput'
 import { TokenSelectModal } from './TokenSelectModal'
-import { DEFAULT_TOKENS, NATIVE_ATN, isNativeCurrency, type Token } from '../utils/tokens'
-import { CONTRACTS, DEFAULT_SLIPPAGE, DEFAULT_DEADLINE_MINUTES } from '../config/contracts'
+import { DEFAULT_TOKENS, NATIVE_ATN, getWrappedToken, isNativeCurrency, type Token } from '../utils/tokens'
+import { CONTRACTS, DEFAULT_SLIPPAGE, DEFAULT_DEADLINE_MINUTES, POOLS } from '../config/contracts'
 import { ERC20_ABI, QUOTER_V2_ABI, SWAP_ROUTER_ABI, WATN_ABI } from '../config/abis'
 import { getDeadline, applySlippage } from '../utils/math'
 
 type SelectingToken = 'input' | 'output' | null
+type TxType = 'approve' | 'swap' | 'wrap' | 'unwrap' | null
 
 export function Swap() {
   const { address, isConnected } = useAccount()
@@ -23,6 +24,12 @@ export function Swap() {
   const [isQuoting, setIsQuoting] = useState(false)
   const [quoteError, setQuoteError] = useState<string | null>(null)
   const [showSettings, setShowSettings] = useState(false)
+  const [lastTxType, setLastTxType] = useState<TxType>(null)
+
+  const wrappedATN = useMemo(() => getWrappedToken(), [])
+  const isWrap = isNativeCurrency(tokenIn) && tokenOut.address.toLowerCase() === wrappedATN.address.toLowerCase()
+  const isUnwrap = tokenIn.address.toLowerCase() === wrappedATN.address.toLowerCase() && isNativeCurrency(tokenOut)
+  const isWrapOrUnwrap = isWrap || isUnwrap
 
   // Get native balance
   const { data: nativeBalance } = useBalance({ address })
@@ -52,22 +59,39 @@ export function Swap() {
     ? nativeBalance?.value 
     : tokenInBalance as bigint | undefined
 
-  // Check if this is a wrap or unwrap operation
-  const isWrap = isNativeCurrency(tokenIn) && tokenOut.symbol === 'WATN'
-  const isUnwrap = tokenIn.symbol === 'WATN' && isNativeCurrency(tokenOut)
-  const isWrapOrUnwrap = isWrap || isUnwrap
+  const fee = useMemo(() => {
+    const a = isNativeCurrency(tokenIn) ? wrappedATN : tokenIn
+    const b = isNativeCurrency(tokenOut) ? wrappedATN : tokenOut
+
+    const aAddr = a.address.toLowerCase()
+    const bAddr = b.address.toLowerCase()
+    const p0 = POOLS.WATN_USDC.token0.address.toLowerCase()
+    const p1 = POOLS.WATN_USDC.token1.address.toLowerCase()
+
+    if ((aAddr === p0 && bAddr === p1) || (aAddr === p1 && bAddr === p0)) {
+      return POOLS.WATN_USDC.fee
+    }
+
+    return 3000
+  }, [tokenIn, tokenOut, wrappedATN])
 
   // Get quote when input amount changes
   const getQuote = useCallback(async () => {
-    if (!amountIn || parseFloat(amountIn) === 0 || !publicClient) {
+    if (!amountIn || parseFloat(amountIn) === 0) {
       setAmountOut('')
+      setQuoteError(null)
       return
     }
 
-    // Wrap/unwrap is 1:1
     if (isWrapOrUnwrap) {
-      setAmountOut(amountIn)
+      setIsQuoting(false)
       setQuoteError(null)
+      setAmountOut(amountIn) // 1:1 wrap/unwrap
+      return
+    }
+
+    if (!publicClient) {
+      setAmountOut('')
       return
     }
 
@@ -76,10 +100,10 @@ export function Swap() {
 
     try {
       const inputToken = isNativeCurrency(tokenIn) 
-        ? DEFAULT_TOKENS.find(t => t.symbol === 'WATN')! 
+        ? wrappedATN
         : tokenIn
       const outputToken = isNativeCurrency(tokenOut)
-        ? DEFAULT_TOKENS.find(t => t.symbol === 'WATN')!
+        ? wrappedATN
         : tokenOut
       
       const amountInWei = parseUnits(amountIn, inputToken.decimals)
@@ -93,7 +117,7 @@ export function Swap() {
           tokenIn: inputToken.address,
           tokenOut: outputToken.address,
           amountIn: amountInWei,
-          fee: 500, // 0.05% fee tier (the existing WATN/USDC pool)
+          fee,
           sqrtPriceLimitX96: 0n,
         }],
       })
@@ -107,7 +131,7 @@ export function Swap() {
     } finally {
       setIsQuoting(false)
     }
-  }, [amountIn, tokenIn, tokenOut, publicClient, isWrapOrUnwrap])
+  }, [amountIn, fee, isWrapOrUnwrap, publicClient, tokenIn, tokenOut, wrappedATN])
 
   useEffect(() => {
     const timer = setTimeout(getQuote, 500)
@@ -117,12 +141,19 @@ export function Swap() {
   // Reset on successful tx
   useEffect(() => {
     if (isConfirmed) {
-      setAmountIn('')
-      setAmountOut('')
+      if (lastTxType === 'approve') {
+        // Keep amounts; user can click Swap (or Unwrap) next.
+        refetchAllowance()
+      } else {
+        setAmountIn('')
+        setAmountOut('')
+        refetchAllowance()
+      }
+
       resetWrite()
-      refetchAllowance()
+      setLastTxType(null)
     }
-  }, [isConfirmed, resetWrite, refetchAllowance])
+  }, [isConfirmed, lastTxType, resetWrite, refetchAllowance])
 
   const handleSwapTokens = () => {
     setTokenIn(tokenOut)
@@ -151,6 +182,7 @@ export function Swap() {
   }
 
   const needsApproval = () => {
+    if (isWrapOrUnwrap) return false
     if (isNativeCurrency(tokenIn)) return false
     if (!amountIn || parseFloat(amountIn) === 0) return false
     if (allowance === undefined) return true
@@ -164,6 +196,7 @@ export function Swap() {
     
     const amountInWei = parseUnits(amountIn, tokenIn.decimals)
     
+    setLastTxType('approve')
     writeContract({
       address: tokenIn.address,
       abi: ERC20_ABI,
@@ -172,89 +205,103 @@ export function Swap() {
     })
   }
 
+  const handleWrap = async () => {
+    if (!address || !amountIn) return
+
+    const amountInWei = parseUnits(amountIn, wrappedATN.decimals)
+
+    setLastTxType('wrap')
+    writeContract({
+      address: wrappedATN.address,
+      abi: WATN_ABI,
+      functionName: 'deposit',
+      value: amountInWei,
+    })
+  }
+
+  const handleUnwrap = async () => {
+    if (!address || !amountIn) return
+
+    const amountInWei = parseUnits(amountIn, wrappedATN.decimals)
+
+    setLastTxType('unwrap')
+    writeContract({
+      address: wrappedATN.address,
+      abi: WATN_ABI,
+      functionName: 'withdraw',
+      args: [amountInWei],
+    })
+  }
+
   const handleSwap = async () => {
     if (!address || !amountIn || !amountOut) return
 
-    const watnToken = DEFAULT_TOKENS.find(t => t.symbol === 'WATN')!
-    const amountInWei = parseUnits(amountIn, tokenIn.decimals || 18)
+    const inputToken = isNativeCurrency(tokenIn) 
+      ? wrappedATN
+      : tokenIn
+    const outputToken = isNativeCurrency(tokenOut)
+      ? wrappedATN
+      : tokenOut
+
+    // No-op safety (e.g. ATN -> ATN). WATN <-> ATN is handled as wrap/unwrap above.
+    if (inputToken.address.toLowerCase() === outputToken.address.toLowerCase()) return
+
+    const amountInWei = parseUnits(amountIn, inputToken.decimals)
+    const amountOutWei = parseUnits(amountOut, outputToken.decimals)
+    const minAmountOut = applySlippage(amountOutWei, slippage, true)
+    const deadline = getDeadline(DEFAULT_DEADLINE_MINUTES)
 
     try {
-      // Handle wrap: ATN -> WATN
-      if (isWrap) {
+      if (isNativeCurrency(tokenIn)) {
+        // ATN -> Token: send ATN as msg.value; router will wrap to WATN internally (must match router's WETH9/WATN).
+        setLastTxType('swap')
         writeContract({
-          address: watnToken.address,
-          abi: WATN_ABI,
-          functionName: 'deposit',
+          address: CONTRACTS.swapRouter02,
+          abi: SWAP_ROUTER_ABI,
+          functionName: 'exactInputSingle',
+          args: [{
+            tokenIn: inputToken.address,
+            tokenOut: outputToken.address,
+            fee,
+            recipient: address,
+            amountIn: amountInWei,
+            amountOutMinimum: minAmountOut,
+            sqrtPriceLimitX96: 0n,
+          }],
           value: amountInWei,
         })
-        return
-      }
-
-      // Handle unwrap: WATN -> ATN
-      if (isUnwrap) {
-        writeContract({
-          address: watnToken.address,
-          abi: WATN_ABI,
-          functionName: 'withdraw',
-          args: [amountInWei],
-        })
-        return
-      }
-
-      // Regular swap through Uniswap
-      const inputToken = isNativeCurrency(tokenIn) ? watnToken : tokenIn
-      const outputToken = isNativeCurrency(tokenOut) ? watnToken : tokenOut
-
-      const amountOutWei = parseUnits(amountOut, outputToken.decimals)
-      const minAmountOut = applySlippage(amountOutWei, slippage, true)
-      const deadline = getDeadline(DEFAULT_DEADLINE_MINUTES)
-
-      if (isNativeCurrency(tokenIn)) {
-        // ATN -> Token: Wrap and swap in one transaction
-        const wrapData = encodeFunctionData({
-          abi: WATN_ABI,
-          functionName: 'deposit',
-        })
-        
+      } else if (isNativeCurrency(tokenOut)) {
+        // Token -> ATN: swap into WATN with recipient = router, then unwrapWETH9 -> ATN to user
         const swapData = encodeFunctionData({
           abi: SWAP_ROUTER_ABI,
           functionName: 'exactInputSingle',
           args: [{
             tokenIn: inputToken.address,
             tokenOut: outputToken.address,
-            fee: 500, // 0.05% fee tier
-            recipient: address,
+            fee,
+            recipient: CONTRACTS.swapRouter02,
             amountIn: amountInWei,
             amountOutMinimum: minAmountOut,
             sqrtPriceLimitX96: 0n,
           }],
         })
 
+        const unwrapData = encodeFunctionData({
+          abi: SWAP_ROUTER_ABI,
+          functionName: 'unwrapWETH9',
+          args: [minAmountOut, address],
+        })
+
+        setLastTxType('swap')
         writeContract({
           address: CONTRACTS.swapRouter02,
           abi: SWAP_ROUTER_ABI,
           functionName: 'multicall',
-          args: [deadline, [wrapData, swapData]],
-          value: amountInWei,
-        })
-      } else if (isNativeCurrency(tokenOut)) {
-        // Token -> ETH: Swap and unwrap
-        writeContract({
-          address: CONTRACTS.swapRouter02,
-          abi: SWAP_ROUTER_ABI,
-          functionName: 'exactInputSingle',
-          args: [{
-            tokenIn: inputToken.address,
-            tokenOut: outputToken.address,
-            fee: 500, // 0.05% fee tier
-            recipient: address,
-            amountIn: amountInWei,
-            amountOutMinimum: minAmountOut,
-            sqrtPriceLimitX96: 0n,
-          }],
+          args: [deadline, [swapData, unwrapData]],
         })
       } else {
         // Token -> Token
+        setLastTxType('swap')
         writeContract({
           address: CONTRACTS.swapRouter02,
           abi: SWAP_ROUTER_ABI,
@@ -262,7 +309,7 @@ export function Swap() {
           args: [{
             tokenIn: inputToken.address,
             tokenOut: outputToken.address,
-            fee: 500, // 0.05% fee tier
+            fee,
             recipient: address,
             amountIn: amountInWei,
             amountOutMinimum: minAmountOut,
@@ -283,9 +330,9 @@ export function Swap() {
     if (inputBalance !== undefined && parseUnits(amountIn, tokenIn.decimals) > inputBalance) {
       return `Insufficient ${tokenIn.symbol}`
     }
-    if (needsApproval()) return `Approve ${tokenIn.symbol}`
     if (isWrap) return 'Wrap'
     if (isUnwrap) return 'Unwrap'
+    if (needsApproval()) return `Approve ${tokenIn.symbol}`
     return 'Swap'
   }
 
@@ -299,6 +346,14 @@ export function Swap() {
   }
 
   const handleButtonClick = () => {
+    if (isWrap) {
+      handleWrap()
+      return
+    }
+    if (isUnwrap) {
+      handleUnwrap()
+      return
+    }
     if (needsApproval()) {
       handleApprove()
     } else {
@@ -384,23 +439,14 @@ export function Swap() {
               <span>Rate</span>
               <span>1 {tokenIn.symbol} = {(parseFloat(amountOut) / parseFloat(amountIn)).toFixed(6)} {tokenOut.symbol}</span>
             </div>
-            {isWrapOrUnwrap ? (
-              <div className="swap-detail-row">
-                <span>Type</span>
-                <span>{isWrap ? 'Wrap' : 'Unwrap'} (no fees)</span>
-              </div>
-            ) : (
-              <>
-                <div className="swap-detail-row">
-                  <span>Slippage</span>
-                  <span>{slippage}%</span>
-                </div>
-                <div className="swap-detail-row">
-                  <span>Min. received</span>
-                  <span>{(parseFloat(amountOut) * (1 - slippage / 100)).toFixed(6)} {tokenOut.symbol}</span>
-                </div>
-              </>
-            )}
+            <div className="swap-detail-row">
+              <span>Slippage</span>
+              <span>{slippage}%</span>
+            </div>
+            <div className="swap-detail-row">
+              <span>Min. received</span>
+              <span>{(parseFloat(amountOut) * (1 - slippage / 100)).toFixed(6)} {tokenOut.symbol}</span>
+            </div>
           </div>
         )}
 
@@ -423,6 +469,7 @@ export function Swap() {
         isOpen={selectingToken !== null}
         onClose={() => setSelectingToken(null)}
         onSelect={handleTokenSelect}
+        excludeToken={selectingToken === 'input' ? tokenOut : tokenIn}
         includeNative
       />
     </div>
