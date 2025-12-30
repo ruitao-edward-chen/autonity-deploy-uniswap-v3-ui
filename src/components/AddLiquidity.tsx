@@ -4,7 +4,7 @@ import { parseUnits, formatUnits } from 'viem'
 import { TokenInput } from './TokenInput'
 import { TokenSelectModal } from './TokenSelectModal'
 import { DEFAULT_TOKENS, sortTokens, type Token } from '../utils/tokens'
-import { CONTRACTS, FEE_TIERS, DEFAULT_SLIPPAGE, DEFAULT_DEADLINE_MINUTES } from '../config/contracts'
+import { CONTRACTS, FEE_TIERS, DEFAULT_SLIPPAGE, DEFAULT_DEADLINE_MINUTES, POOLS } from '../config/contracts'
 import { ERC20_ABI, POSITION_MANAGER_ABI, POOL_ABI, FACTORY_ABI } from '../config/abis'
 import { 
   nearestUsableTick, 
@@ -59,15 +59,46 @@ export function AddLiquidity({ onBack, existingPosition }: AddLiquidityProps) {
   const [token0, token1] = useMemo(() => sortTokens(tokenA, tokenB), [tokenA, tokenB])
   const isToken0First = token0.address === tokenA.address
 
-  // Get pool address
-  const { data: poolAddress } = useReadContract({
+  // Get pool address from factory
+  const { data: poolAddressRaw } = useReadContract({
     address: CONTRACTS.v3Factory,
     abi: FACTORY_ABI,
     functionName: 'getPool',
     args: [token0.address, token1.address, selectedFee],
   })
 
-  const poolExists = poolAddress && poolAddress !== '0x0000000000000000000000000000000000000000'
+  // Check if this is the known WATN/USDC pool
+  const isKnownPool = useMemo(() => {
+    const watnAddr = POOLS.WATN_USDC.token0.address.toLowerCase()
+    const usdcAddr = POOLS.WATN_USDC.token1.address.toLowerCase()
+    const t0 = token0.address.toLowerCase()
+    const t1 = token1.address.toLowerCase()
+    return selectedFee === 3000 && 
+           ((t0 === watnAddr && t1 === usdcAddr) || (t0 === usdcAddr && t1 === watnAddr))
+  }, [token0.address, token1.address, selectedFee])
+
+  // Use known pool address as fallback if factory lookup fails
+  const poolAddress = useMemo(() => {
+    const factoryResult = poolAddressRaw as `0x${string}` | undefined
+    const zeroAddress = '0x0000000000000000000000000000000000000000'
+    
+    // If factory returned a valid address, use it
+    if (factoryResult && factoryResult.toLowerCase() !== zeroAddress.toLowerCase()) {
+      return factoryResult
+    }
+    
+    // Fallback to known pool address for WATN/USDC
+    if (isKnownPool) {
+      return POOLS.WATN_USDC.address
+    }
+    
+    return undefined
+  }, [poolAddressRaw, isKnownPool])
+
+  const poolExists = Boolean(poolAddress)
+
+  // Debug logging
+  console.log('Pool lookup:', 'token0:', token0.address, 'token1:', token1.address, 'fee:', selectedFee, 'factoryResult:', poolAddressRaw, 'poolAddress:', poolAddress, 'isKnownPool:', isKnownPool, 'poolExists:', poolExists)
 
   // Get pool state if exists
   const { data: slot0 } = useReadContract({
@@ -88,8 +119,13 @@ export function AddLiquidity({ onBack, existingPosition }: AddLiquidityProps) {
 
   // Current price from pool
   const currentPrice = useMemo(() => {
-    if (!slot0) return null
-    return sqrtPriceX96ToPrice(slot0[0] as bigint, token0.decimals, token1.decimals)
+    if (!slot0) {
+      console.log('No slot0 data')
+      return null
+    }
+    const sqrtPriceX96 = slot0[0] as bigint
+    console.log('slot0:', { sqrtPriceX96: sqrtPriceX96.toString(), tick: slot0[1] })
+    return sqrtPriceX96ToPrice(sqrtPriceX96, token0.decimals, token1.decimals)
   }, [slot0, token0.decimals, token1.decimals])
 
   const currentTick = slot0 ? Number(slot0[1]) : 0
@@ -168,14 +204,15 @@ export function AddLiquidity({ onBack, existingPosition }: AddLiquidityProps) {
 
   // Set initial prices from current pool price
   useEffect(() => {
-    if (currentPrice && !minPrice && !maxPrice) {
-      // Set default range to ±20% of current price
-      const lower = currentPrice * 0.8
-      const upper = currentPrice * 1.2
+    if (currentPrice && minPrice === '' && maxPrice === '') {
+      // Set default range to ±50% of current price for better UX
+      const lower = currentPrice * 0.5
+      const upper = currentPrice * 1.5
+      console.log('Setting price range:', 'currentPrice:', currentPrice, 'lower:', lower, 'upper:', upper)
       setMinPrice(formatPrice(lower))
       setMaxPrice(formatPrice(upper))
     }
-  }, [currentPrice, minPrice, maxPrice])
+  }, [currentPrice]) // Only depend on currentPrice
 
   // Reset on success
   useEffect(() => {
