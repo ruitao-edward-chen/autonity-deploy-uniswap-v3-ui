@@ -284,6 +284,8 @@ export function Swap() {
       return `Insufficient ${tokenIn.symbol}`
     }
     if (needsApproval()) return `Approve ${tokenIn.symbol}`
+    if (isWrap) return 'Wrap'
+    if (isUnwrap) return 'Unwrap'
     return 'Swap'
   }
 
@@ -382,14 +384,23 @@ export function Swap() {
               <span>Rate</span>
               <span>1 {tokenIn.symbol} = {(parseFloat(amountOut) / parseFloat(amountIn)).toFixed(6)} {tokenOut.symbol}</span>
             </div>
-            <div className="swap-detail-row">
-              <span>Slippage</span>
-              <span>{slippage}%</span>
-            </div>
-            <div className="swap-detail-row">
-              <span>Min. received</span>
-              <span>{(parseFloat(amountOut) * (1 - slippage / 100)).toFixed(6)} {tokenOut.symbol}</span>
-            </div>
+            {isWrapOrUnwrap ? (
+              <div className="swap-detail-row">
+                <span>Type</span>
+                <span>{isWrap ? 'Wrap' : 'Unwrap'} (no fees)</span>
+              </div>
+            ) : (
+              <>
+                <div className="swap-detail-row">
+                  <span>Slippage</span>
+                  <span>{slippage}%</span>
+                </div>
+                <div className="swap-detail-row">
+                  <span>Min. received</span>
+                  <span>{(parseFloat(amountOut) * (1 - slippage / 100)).toFixed(6)} {tokenOut.symbol}</span>
+                </div>
+              </>
+            )}
           </div>
         )}
 
