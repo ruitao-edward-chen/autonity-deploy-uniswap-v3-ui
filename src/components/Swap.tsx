@@ -52,10 +52,22 @@ export function Swap() {
     ? nativeBalance?.value 
     : tokenInBalance as bigint | undefined
 
+  // Check if this is a wrap or unwrap operation
+  const isWrap = isNativeCurrency(tokenIn) && tokenOut.symbol === 'WATN'
+  const isUnwrap = tokenIn.symbol === 'WATN' && isNativeCurrency(tokenOut)
+  const isWrapOrUnwrap = isWrap || isUnwrap
+
   // Get quote when input amount changes
   const getQuote = useCallback(async () => {
     if (!amountIn || parseFloat(amountIn) === 0 || !publicClient) {
       setAmountOut('')
+      return
+    }
+
+    // Wrap/unwrap is 1:1
+    if (isWrapOrUnwrap) {
+      setAmountOut(amountIn)
+      setQuoteError(null)
       return
     }
 
@@ -81,7 +93,7 @@ export function Swap() {
           tokenIn: inputToken.address,
           tokenOut: outputToken.address,
           amountIn: amountInWei,
-          fee: 3000, // 0.3% fee tier
+          fee: 500, // 0.05% fee tier (the existing WATN/USDC pool)
           sqrtPriceLimitX96: 0n,
         }],
       })
@@ -95,7 +107,7 @@ export function Swap() {
     } finally {
       setIsQuoting(false)
     }
-  }, [amountIn, tokenIn, tokenOut, publicClient])
+  }, [amountIn, tokenIn, tokenOut, publicClient, isWrapOrUnwrap])
 
   useEffect(() => {
     const timer = setTimeout(getQuote, 500)
@@ -163,22 +175,42 @@ export function Swap() {
   const handleSwap = async () => {
     if (!address || !amountIn || !amountOut) return
 
-    const inputToken = isNativeCurrency(tokenIn) 
-      ? DEFAULT_TOKENS.find(t => t.symbol === 'WATN')! 
-      : tokenIn
-    const outputToken = isNativeCurrency(tokenOut)
-      ? DEFAULT_TOKENS.find(t => t.symbol === 'WATN')!
-      : tokenOut
-
-    const amountInWei = parseUnits(amountIn, inputToken.decimals)
-    const amountOutWei = parseUnits(amountOut, outputToken.decimals)
-    const minAmountOut = applySlippage(amountOutWei, slippage, true)
-    const deadline = getDeadline(DEFAULT_DEADLINE_MINUTES)
+    const watnToken = DEFAULT_TOKENS.find(t => t.symbol === 'WATN')!
+    const amountInWei = parseUnits(amountIn, tokenIn.decimals || 18)
 
     try {
+      // Handle wrap: ATN -> WATN
+      if (isWrap) {
+        writeContract({
+          address: watnToken.address,
+          abi: WATN_ABI,
+          functionName: 'deposit',
+          value: amountInWei,
+        })
+        return
+      }
+
+      // Handle unwrap: WATN -> ATN
+      if (isUnwrap) {
+        writeContract({
+          address: watnToken.address,
+          abi: WATN_ABI,
+          functionName: 'withdraw',
+          args: [amountInWei],
+        })
+        return
+      }
+
+      // Regular swap through Uniswap
+      const inputToken = isNativeCurrency(tokenIn) ? watnToken : tokenIn
+      const outputToken = isNativeCurrency(tokenOut) ? watnToken : tokenOut
+
+      const amountOutWei = parseUnits(amountOut, outputToken.decimals)
+      const minAmountOut = applySlippage(amountOutWei, slippage, true)
+      const deadline = getDeadline(DEFAULT_DEADLINE_MINUTES)
+
       if (isNativeCurrency(tokenIn)) {
-        // ETH -> Token: Need to wrap and swap
-        // Using multicall to wrap ETH and swap in one transaction
+        // ATN -> Token: Wrap and swap in one transaction
         const wrapData = encodeFunctionData({
           abi: WATN_ABI,
           functionName: 'deposit',
@@ -190,7 +222,7 @@ export function Swap() {
           args: [{
             tokenIn: inputToken.address,
             tokenOut: outputToken.address,
-            fee: 3000,
+            fee: 500, // 0.05% fee tier
             recipient: address,
             amountIn: amountInWei,
             amountOutMinimum: minAmountOut,
@@ -214,7 +246,7 @@ export function Swap() {
           args: [{
             tokenIn: inputToken.address,
             tokenOut: outputToken.address,
-            fee: 3000,
+            fee: 500, // 0.05% fee tier
             recipient: address,
             amountIn: amountInWei,
             amountOutMinimum: minAmountOut,
@@ -230,7 +262,7 @@ export function Swap() {
           args: [{
             tokenIn: inputToken.address,
             tokenOut: outputToken.address,
-            fee: 3000,
+            fee: 500, // 0.05% fee tier
             recipient: address,
             amountIn: amountInWei,
             amountOutMinimum: minAmountOut,
