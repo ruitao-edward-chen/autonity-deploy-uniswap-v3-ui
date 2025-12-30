@@ -17,11 +17,6 @@ export function Header() {
           </svg>
           <span className="logo-text">Autonity Swap</span>
         </div>
-        
-        <nav className="nav-links">
-          <a href="#swap" className="nav-link active">Swap</a>
-          <a href="#pool" className="nav-link">Pool</a>
-        </nav>
 
         <div className="wallet-section">
           {isConnected ? (
