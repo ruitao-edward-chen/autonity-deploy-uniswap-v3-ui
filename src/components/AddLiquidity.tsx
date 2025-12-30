@@ -44,8 +44,8 @@ export function AddLiquidity({ onBack, existingPosition }: AddLiquidityProps) {
   const [amountA, setAmountA] = useState('')
   const [amountB, setAmountB] = useState('')
   
-  // Fee tier
-  const [selectedFee, setSelectedFee] = useState(3000)
+  // Fee tier - default to 0.05% (500) since that's the existing WATN/USDC pool
+  const [selectedFee, setSelectedFee] = useState(500)
   
   // Price range
   const [minPrice, setMinPrice] = useState('')
@@ -368,21 +368,31 @@ export function AddLiquidity({ onBack, existingPosition }: AddLiquidityProps) {
         <div className="fee-tier-section">
           <label className="section-label">Select Fee Tier</label>
           <div className="fee-tier-options">
-            {FEE_TIERS.map(tier => (
-              <button
-                key={tier.fee}
-                className={`fee-tier-option ${selectedFee === tier.fee ? 'selected' : ''}`}
-                onClick={() => setSelectedFee(tier.fee)}
-              >
-                <span className="fee-label">{tier.label}</span>
-                <span className="fee-desc">
-                  {tier.fee === 100 && 'Very stable pairs'}
-                  {tier.fee === 500 && 'Stable pairs'}
-                  {tier.fee === 3000 && 'Most pairs'}
-                  {tier.fee === 10000 && 'Exotic pairs'}
-                </span>
-              </button>
-            ))}
+            {FEE_TIERS.map(tier => {
+              // Check if this fee tier has an existing pool for the selected tokens
+              const hasExistingPool = tier.fee === POOLS.WATN_USDC.fee && 
+                ((token0.address.toLowerCase() === POOLS.WATN_USDC.token0.address.toLowerCase() &&
+                  token1.address.toLowerCase() === POOLS.WATN_USDC.token1.address.toLowerCase()) ||
+                 (token0.address.toLowerCase() === POOLS.WATN_USDC.token1.address.toLowerCase() &&
+                  token1.address.toLowerCase() === POOLS.WATN_USDC.token0.address.toLowerCase()))
+              
+              return (
+                <button
+                  key={tier.fee}
+                  className={`fee-tier-option ${selectedFee === tier.fee ? 'selected' : ''} ${hasExistingPool ? 'has-pool' : ''}`}
+                  onClick={() => setSelectedFee(tier.fee)}
+                >
+                  <span className="fee-label">{tier.label}</span>
+                  <span className="fee-desc">
+                    {tier.fee === 100 && 'Very stable pairs'}
+                    {tier.fee === 500 && 'Stable pairs'}
+                    {tier.fee === 3000 && 'Most pairs'}
+                    {tier.fee === 10000 && 'Exotic pairs'}
+                  </span>
+                  {hasExistingPool && <span className="pool-exists-badge">Pool exists</span>}
+                </button>
+              )
+            })}
           </div>
         </div>
 
