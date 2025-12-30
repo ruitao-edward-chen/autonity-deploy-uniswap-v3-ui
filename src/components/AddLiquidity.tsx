@@ -441,17 +441,11 @@ export function AddLiquidity({ onBack, existingPosition }: AddLiquidityProps) {
             </div>
           )}
 
-          {isFullRange && (
-            <div className="full-range-warning">
-              ⚠️ Full range positions may earn less fees due to lower capital efficiency
-            </div>
-          )}
-
           {/* Position type indicator */}
           <div className={`position-type-indicator ${positionType}`}>
-            {positionType === 'in-range' && '✓ Price is in range - Both tokens required'}
-            {positionType === 'above-range' && '↑ Price above range - Only ' + token0.symbol + ' required (one-sided)'}
-            {positionType === 'below-range' && '↓ Price below range - Only ' + token1.symbol + ' required (one-sided)'}
+            {positionType === 'in-range' && 'Price is in range'}
+            {positionType === 'above-range' && 'Price above range - Only ' + token0.symbol + ' required'}
+            {positionType === 'below-range' && 'Price below range - Only ' + token1.symbol + ' required'}
             {positionType === 'full-range' && '∞ Full range position'}
             {positionType === 'invalid' && '⚠ Invalid price range'}
           </div>
