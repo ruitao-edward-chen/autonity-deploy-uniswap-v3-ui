@@ -923,6 +923,16 @@ body {
   position: relative;
 }
 
+.fee-tier-option.no-pool {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--color-bg-secondary);
+}
+
+.fee-tier-option.no-pool:hover {
+  border-color: var(--color-border);
+}
+
 .pool-exists-badge {
   display: block;
   font-size: 0.5rem;
@@ -931,18 +941,19 @@ body {
   margin-top: 4px;
 }
 
+.no-pool-badge {
+  display: block;
+  font-size: 0.5rem;
+  color: var(--color-text-tertiary);
+  font-weight: 500;
+  margin-top: 4px;
+}
+
 .fee-label {
   display: block;
   font-weight: 600;
   font-size: 0.875rem;
   color: var(--color-text-primary);
-}
-
-.fee-desc {
-  display: block;
-  font-size: 0.625rem;
-  color: var(--color-text-tertiary);
-  margin-top: 2px;
 }
 
 /* Price Range Section */

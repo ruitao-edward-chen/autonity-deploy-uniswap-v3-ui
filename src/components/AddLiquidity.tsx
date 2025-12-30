@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useBalance } from 'wagmi'
+import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useBalance } from 'wagmi'
 import { parseUnits, formatUnits } from 'viem'
 import { TokenInput } from './TokenInput'
 import { TokenSelectModal } from './TokenSelectModal'
@@ -59,46 +59,55 @@ export function AddLiquidity({ onBack, existingPosition }: AddLiquidityProps) {
   const [token0, token1] = useMemo(() => sortTokens(tokenA, tokenB), [tokenA, tokenB])
   const isToken0First = token0.address === tokenA.address
 
-  // Get pool address from factory
-  const { data: poolAddressRaw } = useReadContract({
-    address: CONTRACTS.v3Factory,
-    abi: FACTORY_ABI,
-    functionName: 'getPool',
-    args: [token0.address, token1.address, selectedFee],
+  // Check which fee tiers have existing pools for the selected token pair
+  const poolQueries = useMemo(() => 
+    FEE_TIERS.map(tier => ({
+      address: CONTRACTS.v3Factory as `0x${string}`,
+      abi: FACTORY_ABI,
+      functionName: 'getPool' as const,
+      args: [token0.address, token1.address, tier.fee] as const,
+    })),
+    [token0.address, token1.address]
+  )
+
+  const { data: poolResults } = useReadContracts({
+    contracts: poolQueries,
   })
 
-  // Check if this is the known WATN/USDC pool
-  const isKnownPool = useMemo(() => {
+  // Map fee tiers to their pool existence status
+  const feePoolMap = useMemo(() => {
+    const zeroAddress = '0x0000000000000000000000000000000000000000'
+    const map: Record<number, { exists: boolean; address?: string }> = {}
+    
+    // Check if selected tokens are WATN/USDC pair
     const watnAddr = POOLS.WATN_USDC.token0.address.toLowerCase()
     const usdcAddr = POOLS.WATN_USDC.token1.address.toLowerCase()
     const t0 = token0.address.toLowerCase()
     const t1 = token1.address.toLowerCase()
-    return selectedFee === 3000 && 
-           ((t0 === watnAddr && t1 === usdcAddr) || (t0 === usdcAddr && t1 === watnAddr))
-  }, [token0.address, token1.address, selectedFee])
+    const isWatnUsdcPair = (t0 === watnAddr && t1 === usdcAddr) || (t0 === usdcAddr && t1 === watnAddr)
+    
+    FEE_TIERS.forEach((tier, index) => {
+      const result = poolResults?.[index]?.result as `0x${string}` | undefined
+      const hasPoolFromFactory = result && result.toLowerCase() !== zeroAddress.toLowerCase()
+      
+      // For WATN/USDC pair at 0.05% fee, use known pool as fallback
+      const isKnownPool = isWatnUsdcPair && tier.fee === POOLS.WATN_USDC.fee
+      
+      map[tier.fee] = {
+        exists: hasPoolFromFactory || isKnownPool,
+        address: hasPoolFromFactory ? result : (isKnownPool ? POOLS.WATN_USDC.address : undefined)
+      }
+    })
+    
+    return map
+  }, [poolResults, token0.address, token1.address])
 
-  // Use known pool address as fallback if factory lookup fails
-  const poolAddress = useMemo(() => {
-    const factoryResult = poolAddressRaw as `0x${string}` | undefined
-    const zeroAddress = '0x0000000000000000000000000000000000000000'
-    
-    // If factory returned a valid address, use it
-    if (factoryResult && factoryResult.toLowerCase() !== zeroAddress.toLowerCase()) {
-      return factoryResult
-    }
-    
-    // Fallback to known pool address for WATN/USDC
-    if (isKnownPool) {
-      return POOLS.WATN_USDC.address
-    }
-    
-    return undefined
-  }, [poolAddressRaw, isKnownPool])
-
-  const poolExists = Boolean(poolAddress)
+  // Get current pool address based on selected fee
+  const poolAddress = feePoolMap[selectedFee]?.address
+  const poolExists = feePoolMap[selectedFee]?.exists || false
 
   // Debug logging
-  console.log('Pool lookup:', 'token0:', token0.address, 'token1:', token1.address, 'fee:', selectedFee, 'factoryResult:', poolAddressRaw, 'poolAddress:', poolAddress, 'isKnownPool:', isKnownPool, 'poolExists:', poolExists)
+  console.log('Pool lookup:', 'token0:', token0.address, 'token1:', token1.address, 'fee:', selectedFee, 'poolAddress:', poolAddress, 'poolExists:', poolExists, 'feePoolMap:', feePoolMap)
 
   // Get pool state if exists
   const { data: slot0 } = useReadContract({
@@ -369,27 +378,18 @@ export function AddLiquidity({ onBack, existingPosition }: AddLiquidityProps) {
           <label className="section-label">Select Fee Tier</label>
           <div className="fee-tier-options">
             {FEE_TIERS.map(tier => {
-              // Check if this fee tier has an existing pool for the selected tokens
-              const hasExistingPool = tier.fee === POOLS.WATN_USDC.fee && 
-                ((token0.address.toLowerCase() === POOLS.WATN_USDC.token0.address.toLowerCase() &&
-                  token1.address.toLowerCase() === POOLS.WATN_USDC.token1.address.toLowerCase()) ||
-                 (token0.address.toLowerCase() === POOLS.WATN_USDC.token1.address.toLowerCase() &&
-                  token1.address.toLowerCase() === POOLS.WATN_USDC.token0.address.toLowerCase()))
+              const hasPool = feePoolMap[tier.fee]?.exists || false
               
               return (
                 <button
                   key={tier.fee}
-                  className={`fee-tier-option ${selectedFee === tier.fee ? 'selected' : ''} ${hasExistingPool ? 'has-pool' : ''}`}
-                  onClick={() => setSelectedFee(tier.fee)}
+                  className={`fee-tier-option ${selectedFee === tier.fee ? 'selected' : ''} ${hasPool ? 'has-pool' : 'no-pool'}`}
+                  onClick={() => hasPool && setSelectedFee(tier.fee)}
+                  disabled={!hasPool}
                 >
                   <span className="fee-label">{tier.label}</span>
-                  <span className="fee-desc">
-                    {tier.fee === 100 && 'Very stable pairs'}
-                    {tier.fee === 500 && 'Stable pairs'}
-                    {tier.fee === 3000 && 'Most pairs'}
-                    {tier.fee === 10000 && 'Exotic pairs'}
-                  </span>
-                  {hasExistingPool && <span className="pool-exists-badge">Pool exists</span>}
+                  {hasPool && <span className="pool-exists-badge">Pool exists</span>}
+                  {!hasPool && <span className="no-pool-badge">No pool</span>}
                 </button>
               )
             })}
