@@ -63,7 +63,6 @@ function AppContent() {
 
       <footer className="footer">
         <div className="footer-content">
-          <span>Powered by Uniswap V3 on Autonity</span>
           <div className="footer-links">
             <a href="https://autonityscan.org" target="_blank" rel="noopener noreferrer">
               Explorer

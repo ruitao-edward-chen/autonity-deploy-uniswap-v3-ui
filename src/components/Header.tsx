@@ -11,11 +11,7 @@ export function Header() {
     <header className="header">
       <div className="header-content">
         <div className="logo">
-          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-            <circle cx="16" cy="16" r="15" stroke="currentColor" strokeWidth="2"/>
-            <path d="M10 16L14 20L22 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          <span className="logo-text">Autonity Swap</span>
+          <span className="logo-text">Uniswap V3 on Autonity</span>
         </div>
 
         <div className="wallet-section">
