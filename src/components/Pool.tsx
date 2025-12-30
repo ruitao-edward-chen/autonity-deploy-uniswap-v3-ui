@@ -147,7 +147,7 @@ export function Pool() {
               setShowAddLiquidity(true)
             }}
           >
-            + New Position
+            + New
           </button>
         </div>
 

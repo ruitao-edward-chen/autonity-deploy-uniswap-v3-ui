@@ -668,14 +668,14 @@ body {
 
 .add-liquidity-button {
   width: auto;
-  max-width: 140px;
-  padding: 6px 14px;
+  max-width: 100px;
+  padding: 5px 12px;
   border-radius: var(--radius-sm);
   border: none;
   background: var(--color-primary);
   color: white;
   font-weight: 500;
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
