@@ -11,6 +11,77 @@ import { getDeadline, applySlippage } from '../utils/math'
 type SelectingToken = 'input' | 'output' | null
 type TxType = 'approve' | 'swap' | 'wrap' | 'unwrap' | null
 
+const MAX_DISPLAY_DECIMALS = 6
+const MAX_DISPLAY_DECIMALS_FOR_TINY_VALUES = 12
+
+function safeParseUnits(value: string, decimals: number): bigint | null {
+  const trimmed = value.trim()
+  if (trimmed === '' || trimmed === '.' || trimmed.endsWith('.')) return null
+
+  try {
+    return parseUnits(trimmed, decimals)
+  } catch {
+    return null
+  }
+}
+
+function formatAmountForDisplay(amount: bigint, decimals: number): string {
+  const full = formatUnits(amount, decimals)
+  const parts = full.split('.')
+  const intPart = parts[0] ?? '0'
+  const fracPart = parts[1]
+
+  if (!fracPart) return intPart
+
+  const baseCut = Math.min(MAX_DISPLAY_DECIMALS, decimals, fracPart.length)
+  let cut = baseCut
+
+  // If value is < 1 and truncating would show 0.000000..., extend until the first non-zero digit (capped).
+  if (intPart === '0') {
+    const truncated = fracPart.slice(0, baseCut)
+    const isAllZeros = truncated.length > 0 && truncated.replace(/0/g, '') === ''
+
+    if (isAllZeros) {
+      const firstNonZero = fracPart.search(/[1-9]/)
+      if (firstNonZero !== -1) {
+        cut = Math.min(
+          fracPart.length,
+          Math.max(baseCut, firstNonZero + 2),
+          MAX_DISPLAY_DECIMALS_FOR_TINY_VALUES
+        )
+      }
+    }
+  }
+
+  const trimmedFrac = fracPart.slice(0, cut).replace(/0+$/, '')
+  return trimmedFrac ? `${intPart}.${trimmedFrac}` : intPart
+}
+
+function formatScaledFixed(value: bigint, precision: number): string {
+  if (precision <= 0) return value.toString()
+
+  const scale = 10n ** BigInt(precision)
+  const intPart = value / scale
+  const fracPart = value % scale
+  const fracStr = fracPart.toString().padStart(precision, '0').replace(/0+$/, '')
+  return fracStr ? `${intPart.toString()}.${fracStr}` : intPart.toString()
+}
+
+function formatRate(
+  amountInWei: bigint,
+  decimalsIn: number,
+  amountOutWei: bigint,
+  decimalsOut: number,
+  precision: number = 6
+): string {
+  if (amountInWei === 0n) return '0'
+
+  const scale = 10n ** BigInt(precision)
+  const numerator = amountOutWei * (10n ** BigInt(decimalsIn)) * scale
+  const denominator = amountInWei * (10n ** BigInt(decimalsOut))
+  return formatScaledFixed(numerator / denominator, precision)
+}
+
 export function Swap() {
   const { address, isConnected } = useAccount()
   const publicClient = usePublicClient()
@@ -19,12 +90,14 @@ export function Swap() {
   const [tokenOut, setTokenOut] = useState<Token>(DEFAULT_TOKENS[1]) // USDC
   const [amountIn, setAmountIn] = useState('')
   const [amountOut, setAmountOut] = useState('')
+  const [quotedAmountOut, setQuotedAmountOut] = useState<bigint | null>(null)
   const [selectingToken, setSelectingToken] = useState<SelectingToken>(null)
   const [slippage, setSlippage] = useState(DEFAULT_SLIPPAGE)
   const [isQuoting, setIsQuoting] = useState(false)
   const [quoteError, setQuoteError] = useState<string | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [lastTxType, setLastTxType] = useState<TxType>(null)
+  const [isRefreshingBalances, setIsRefreshingBalances] = useState(false)
 
   const wrappedATN = useMemo(() => getWrappedToken(), [])
   const isWrap = isNativeCurrency(tokenIn) && tokenOut.address.toLowerCase() === wrappedATN.address.toLowerCase()
@@ -32,15 +105,27 @@ export function Swap() {
   const isWrapOrUnwrap = isWrap || isUnwrap
 
   // Get native balance
-  const { data: nativeBalance } = useBalance({ address })
+  const { data: nativeBalance, refetch: refetchNativeBalance } = useBalance({
+    address,
+    query: { enabled: !!address },
+  })
   
   // Get token balance for input token
-  const { data: tokenInBalance } = useReadContract({
+  const { data: tokenInBalance, refetch: refetchTokenInBalance } = useReadContract({
     address: isNativeCurrency(tokenIn) ? undefined : tokenIn.address,
     abi: ERC20_ABI,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
     query: { enabled: !!address && !isNativeCurrency(tokenIn) },
+  })
+
+  // Get token balance for output token
+  const { data: tokenOutBalance, refetch: refetchTokenOutBalance } = useReadContract({
+    address: isNativeCurrency(tokenOut) ? undefined : tokenOut.address,
+    abi: ERC20_ABI,
+    functionName: 'balanceOf',
+    args: address ? [address] : undefined,
+    query: { enabled: !!address && !isNativeCurrency(tokenOut) },
   })
 
   // Get allowance for input token
@@ -58,6 +143,37 @@ export function Swap() {
   const inputBalance = isNativeCurrency(tokenIn) 
     ? nativeBalance?.value 
     : tokenInBalance as bigint | undefined
+
+  const outputBalance = isNativeCurrency(tokenOut)
+    ? nativeBalance?.value
+    : tokenOutBalance as bigint | undefined
+
+  const refreshBalances = useCallback(async (options?: { includeAllowance?: boolean }) => {
+    if (!address) return
+
+    setIsRefreshingBalances(true)
+    try {
+      const promises: Promise<unknown>[] = []
+
+      promises.push(refetchNativeBalance())
+
+      if (!isNativeCurrency(tokenIn)) {
+        promises.push(refetchTokenInBalance())
+      }
+
+      if (!isNativeCurrency(tokenOut)) {
+        promises.push(refetchTokenOutBalance())
+      }
+
+      if (options?.includeAllowance !== false && !isNativeCurrency(tokenIn)) {
+        promises.push(refetchAllowance())
+      }
+
+      await Promise.allSettled(promises)
+    } finally {
+      setIsRefreshingBalances(false)
+    }
+  }, [address, refetchAllowance, refetchNativeBalance, refetchTokenInBalance, refetchTokenOutBalance, tokenIn, tokenOut])
 
   const fee = useMemo(() => {
     const a = isNativeCurrency(tokenIn) ? wrappedATN : tokenIn
@@ -77,8 +193,18 @@ export function Swap() {
 
   // Get quote when input amount changes
   const getQuote = useCallback(async () => {
-    if (!amountIn || parseFloat(amountIn) === 0) {
+    const inputToken = isNativeCurrency(tokenIn) 
+      ? wrappedATN
+      : tokenIn
+    const outputToken = isNativeCurrency(tokenOut)
+      ? wrappedATN
+      : tokenOut
+
+    const amountInWei = safeParseUnits(amountIn, inputToken.decimals)
+
+    if (amountInWei === null || amountInWei === 0n) {
       setAmountOut('')
+      setQuotedAmountOut(null)
       setQuoteError(null)
       return
     }
@@ -86,12 +212,14 @@ export function Swap() {
     if (isWrapOrUnwrap) {
       setIsQuoting(false)
       setQuoteError(null)
-      setAmountOut(amountIn) // 1:1 wrap/unwrap
+      setQuotedAmountOut(amountInWei)
+      setAmountOut(formatAmountForDisplay(amountInWei, outputToken.decimals)) // 1:1 wrap/unwrap
       return
     }
 
     if (!publicClient) {
       setAmountOut('')
+      setQuotedAmountOut(null)
       return
     }
 
@@ -99,15 +227,6 @@ export function Swap() {
     setQuoteError(null)
 
     try {
-      const inputToken = isNativeCurrency(tokenIn) 
-        ? wrappedATN
-        : tokenIn
-      const outputToken = isNativeCurrency(tokenOut)
-        ? wrappedATN
-        : tokenOut
-      
-      const amountInWei = parseUnits(amountIn, inputToken.decimals)
-
       // Use staticCall to simulate the quote
       const result = await publicClient.simulateContract({
         address: CONTRACTS.quoterV2,
@@ -123,11 +242,13 @@ export function Swap() {
       })
 
       const quotedAmountOut = result.result[0] as bigint
-      setAmountOut(formatUnits(quotedAmountOut, outputToken.decimals))
+      setQuotedAmountOut(quotedAmountOut)
+      setAmountOut(formatAmountForDisplay(quotedAmountOut, outputToken.decimals))
     } catch (err) {
       console.error('Quote error:', err)
       setQuoteError('Unable to get quote. Pool may not exist or have liquidity.')
       setAmountOut('')
+      setQuotedAmountOut(null)
     } finally {
       setIsQuoting(false)
     }
@@ -143,23 +264,25 @@ export function Swap() {
     if (isConfirmed) {
       if (lastTxType === 'approve') {
         // Keep amounts; user can click Swap (or Unwrap) next.
-        refetchAllowance()
+        refreshBalances()
       } else {
         setAmountIn('')
         setAmountOut('')
-        refetchAllowance()
+        setQuotedAmountOut(null)
+        refreshBalances()
       }
 
       resetWrite()
       setLastTxType(null)
     }
-  }, [isConfirmed, lastTxType, resetWrite, refetchAllowance])
+  }, [isConfirmed, lastTxType, refreshBalances, resetWrite])
 
   const handleSwapTokens = () => {
     setTokenIn(tokenOut)
     setTokenOut(tokenIn)
     setAmountIn(amountOut)
-    setAmountOut(amountIn)
+    setAmountOut('')
+    setQuotedAmountOut(null)
   }
 
   const handleTokenSelect = (token: Token) => {
@@ -169,6 +292,7 @@ export function Swap() {
       } else {
         setTokenIn(token)
         setAmountOut('')
+        setQuotedAmountOut(null)
       }
     } else if (selectingToken === 'output') {
       if (token.address === tokenIn.address) {
@@ -176,6 +300,7 @@ export function Swap() {
       } else {
         setTokenOut(token)
         setAmountOut('')
+        setQuotedAmountOut(null)
       }
     }
     setSelectingToken(null)
@@ -184,17 +309,19 @@ export function Swap() {
   const needsApproval = () => {
     if (isWrapOrUnwrap) return false
     if (isNativeCurrency(tokenIn)) return false
-    if (!amountIn || parseFloat(amountIn) === 0) return false
+
+    const amountInWei = safeParseUnits(amountIn, tokenIn.decimals)
+    if (amountInWei === null || amountInWei === 0n) return false
     if (allowance === undefined) return true
     
-    const amountInWei = parseUnits(amountIn, tokenIn.decimals)
     return (allowance as bigint) < amountInWei
   }
 
   const handleApprove = async () => {
     if (!address) return
     
-    const amountInWei = parseUnits(amountIn, tokenIn.decimals)
+    const amountInWei = safeParseUnits(amountIn, tokenIn.decimals)
+    if (amountInWei === null || amountInWei === 0n) return
     
     setLastTxType('approve')
     writeContract({
@@ -208,7 +335,8 @@ export function Swap() {
   const handleWrap = async () => {
     if (!address || !amountIn) return
 
-    const amountInWei = parseUnits(amountIn, wrappedATN.decimals)
+    const amountInWei = safeParseUnits(amountIn, wrappedATN.decimals)
+    if (amountInWei === null || amountInWei === 0n) return
 
     setLastTxType('wrap')
     writeContract({
@@ -222,7 +350,8 @@ export function Swap() {
   const handleUnwrap = async () => {
     if (!address || !amountIn) return
 
-    const amountInWei = parseUnits(amountIn, wrappedATN.decimals)
+    const amountInWei = safeParseUnits(amountIn, wrappedATN.decimals)
+    if (amountInWei === null || amountInWei === 0n) return
 
     setLastTxType('unwrap')
     writeContract({
@@ -234,7 +363,7 @@ export function Swap() {
   }
 
   const handleSwap = async () => {
-    if (!address || !amountIn || !amountOut) return
+    if (!address || !amountIn || quotedAmountOut === null) return
 
     const inputToken = isNativeCurrency(tokenIn) 
       ? wrappedATN
@@ -246,9 +375,10 @@ export function Swap() {
     // No-op safety (e.g. ATN -> ATN). WATN <-> ATN is handled as wrap/unwrap above.
     if (inputToken.address.toLowerCase() === outputToken.address.toLowerCase()) return
 
-    const amountInWei = parseUnits(amountIn, inputToken.decimals)
-    const amountOutWei = parseUnits(amountOut, outputToken.decimals)
-    const minAmountOut = applySlippage(amountOutWei, slippage, true)
+    const amountInWei = safeParseUnits(amountIn, inputToken.decimals)
+    if (amountInWei === null || amountInWei === 0n) return
+
+    const minAmountOut = applySlippage(quotedAmountOut, slippage, true)
     const deadline = getDeadline(DEFAULT_DEADLINE_MINUTES)
 
     try {
@@ -325,9 +455,12 @@ export function Swap() {
   const getButtonText = () => {
     if (!isConnected) return 'Connect Wallet'
     if (isWriting || isConfirming) return 'Confirming...'
+    if (isQuoting) return 'Calculating...'
     if (!amountIn || parseFloat(amountIn) === 0) return 'Enter Amount'
     if (quoteError) return 'Insufficient Liquidity'
-    if (inputBalance !== undefined && parseUnits(amountIn, tokenIn.decimals) > inputBalance) {
+
+    const parsedAmountInWei = safeParseUnits(amountIn, tokenIn.decimals)
+    if (parsedAmountInWei !== null && inputBalance !== undefined && parsedAmountInWei > inputBalance) {
       return `Insufficient ${tokenIn.symbol}`
     }
     if (isWrap) return 'Wrap'
@@ -339,9 +472,14 @@ export function Swap() {
   const isButtonDisabled = () => {
     if (!isConnected) return true
     if (isWriting || isConfirming) return true
+    if (isQuoting) return true
     if (!amountIn || parseFloat(amountIn) === 0) return true
     if (quoteError) return true
-    if (inputBalance !== undefined && parseUnits(amountIn, tokenIn.decimals) > inputBalance) return true
+
+    const parsedAmountInWei = safeParseUnits(amountIn, tokenIn.decimals)
+    if (parsedAmountInWei === null || parsedAmountInWei === 0n) return true
+    if (!isWrapOrUnwrap && quotedAmountOut === null) return true
+    if (inputBalance !== undefined && parsedAmountInWei > inputBalance) return true
     return false
   }
 
@@ -366,15 +504,43 @@ export function Swap() {
       <div className="swap-card">
         <div className="swap-header">
           <h2>Swap</h2>
-          <button 
-            className="settings-button"
-            onClick={() => setShowSettings(!showSettings)}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-          </button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button
+              className="settings-button"
+              onClick={() => refreshBalances()}
+              disabled={!isConnected || isRefreshingBalances}
+              aria-label="Refresh balances"
+              title="Refresh balances"
+            >
+              {isRefreshingBalances ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <g>
+                    <circle cx="12" cy="12" r="9" strokeOpacity="0.35" />
+                    <path d="M21 12a9 9 0 0 1-9 9" />
+                    <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.9s" repeatCount="indefinite" />
+                  </g>
+                </svg>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="23 4 23 10 17 10" />
+                  <polyline points="1 20 1 14 7 14" />
+                  <path d="M3.51 9a9 9 0 0 1 14.13-3.36L23 10" />
+                  <path d="M1 14l5.37 4.36A9 9 0 0 0 20.49 15" />
+                </svg>
+              )}
+            </button>
+            <button 
+              className="settings-button"
+              onClick={() => setShowSettings(!showSettings)}
+              aria-label="Swap settings"
+              title="Settings"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {showSettings && (
@@ -429,6 +595,7 @@ export function Swap() {
             onAmountChange={() => {}}
             onTokenSelect={() => setSelectingToken('output')}
             label="You receive"
+            balance={outputBalance}
             disabled
           />
         </div>
@@ -437,7 +604,16 @@ export function Swap() {
           <div className="swap-details">
             <div className="swap-detail-row">
               <span>Rate</span>
-              <span>1 {tokenIn.symbol} = {(parseFloat(amountOut) / parseFloat(amountIn)).toFixed(6)} {tokenOut.symbol}</span>
+              <span>
+                1 {tokenIn.symbol} = {(() => {
+                  const inputToken = isNativeCurrency(tokenIn) ? wrappedATN : tokenIn
+                  const outputToken = isNativeCurrency(tokenOut) ? wrappedATN : tokenOut
+                  const amountInWei = safeParseUnits(amountIn, inputToken.decimals)
+
+                  if (quotedAmountOut === null || amountInWei === null || amountInWei === 0n) return '—'
+                  return formatRate(amountInWei, inputToken.decimals, quotedAmountOut, outputToken.decimals)
+                })()} {tokenOut.symbol}
+              </span>
             </div>
             <div className="swap-detail-row">
               <span>Slippage</span>
@@ -445,7 +621,14 @@ export function Swap() {
             </div>
             <div className="swap-detail-row">
               <span>Min. received</span>
-              <span>{(parseFloat(amountOut) * (1 - slippage / 100)).toFixed(6)} {tokenOut.symbol}</span>
+              <span>
+                {(() => {
+                  const outputToken = isNativeCurrency(tokenOut) ? wrappedATN : tokenOut
+                  if (quotedAmountOut === null) return '—'
+                  const minOut = applySlippage(quotedAmountOut, slippage, true)
+                  return formatAmountForDisplay(minOut, outputToken.decimals)
+                })()} {tokenOut.symbol}
+              </span>
             </div>
           </div>
         )}

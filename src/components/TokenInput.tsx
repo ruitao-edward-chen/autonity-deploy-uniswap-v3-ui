@@ -27,8 +27,11 @@ export function TokenInput({
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
-    // Only allow numbers and one decimal point
-    if (/^[0-9]*\.?[0-9]*$/.test(value) || value === '') {
+    // Only allow numbers and one decimal point, and cap decimal places to token.decimals
+    const maxDecimals = token?.decimals ?? 18
+    const pattern = new RegExp(`^[0-9]*\\.?[0-9]{0,${maxDecimals}}$`)
+
+    if (pattern.test(value) || value === '') {
       onAmountChange(value)
     }
   }
