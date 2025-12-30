@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { useAccount, useReadContract, useReadContracts } from 'wagmi'
+import { useAccount, useReadContract, usePublicClient } from 'wagmi'
 import { CONTRACTS, TOKENS, FEE_TIERS } from '../config/contracts'
-import { POSITION_MANAGER_ABI, ERC20_ABI, POOL_ABI } from '../config/abis'
+import { POSITION_MANAGER_ABI, POOL_ABI } from '../config/abis'
 import { getDisplayPriceBounds, formatAmount, sqrtPriceX96ToPrice, formatPrice } from '../utils/math'
 import { getTokenByAddress, type Token } from '../utils/tokens'
 import { AddLiquidity } from './AddLiquidity'
@@ -24,6 +24,8 @@ export function Pool() {
   const [isLoading, setIsLoading] = useState(false)
   const [showAddLiquidity, setShowAddLiquidity] = useState(false)
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const publicClient = usePublicClient()
 
   // Get number of positions owned
   const { data: positionCount } = useReadContract({
@@ -34,27 +36,82 @@ export function Pool() {
     query: { enabled: !!address },
   })
 
-  // Fetch position token IDs
+  // Fetch position token IDs and details
   useEffect(() => {
     const fetchPositions = async () => {
-      if (!address || !positionCount || positionCount === 0n) {
+      if (!address || !positionCount || positionCount === 0n || !publicClient) {
         setPositions([])
         return
       }
 
       setIsLoading(true)
+      setError(null)
       const count = Number(positionCount)
       const fetchedPositions: Position[] = []
 
-      // We'll fetch up to 10 positions for performance
+      // Fetch up to 10 positions for performance
       const maxPositions = Math.min(count, 10)
 
       for (let i = 0; i < maxPositions; i++) {
         try {
-          // This would need to be done with proper multicall in production
-          // For now, we'll show a placeholder
+          // Get tokenId for this position index
+          const tokenId = await publicClient.readContract({
+            address: CONTRACTS.nonfungiblePositionManager,
+            abi: POSITION_MANAGER_ABI,
+            functionName: 'tokenOfOwnerByIndex',
+            args: [address, BigInt(i)],
+          }) as bigint
+
+          // Get position details
+          const positionData = await publicClient.readContract({
+            address: CONTRACTS.nonfungiblePositionManager,
+            abi: POSITION_MANAGER_ABI,
+            functionName: 'positions',
+            args: [tokenId],
+          }) as readonly [bigint, string, string, string, number, number, number, bigint, bigint, bigint, bigint, bigint]
+
+          const [
+            , // nonce
+            , // operator
+            token0Address,
+            token1Address,
+            fee,
+            tickLower,
+            tickUpper,
+            liquidity,
+            , // feeGrowthInside0LastX128
+            , // feeGrowthInside1LastX128
+            tokensOwed0,
+            tokensOwed1,
+          ] = positionData
+
+          // Get token info - use known tokens or create placeholder
+          const token0 = getTokenByAddress(token0Address as `0x${string}`) || {
+            address: token0Address as `0x${string}`,
+            symbol: 'TKN0',
+            name: 'Token 0',
+            decimals: 18,
+          }
+          const token1 = getTokenByAddress(token1Address as `0x${string}`) || {
+            address: token1Address as `0x${string}`,
+            symbol: 'TKN1',
+            name: 'Token 1',
+            decimals: 18,
+          }
+
+          fetchedPositions.push({
+            tokenId,
+            token0,
+            token1,
+            fee: Number(fee),
+            tickLower: Number(tickLower),
+            tickUpper: Number(tickUpper),
+            liquidity: BigInt(liquidity),
+            tokensOwed0: BigInt(tokensOwed0),
+            tokensOwed1: BigInt(tokensOwed1),
+          })
         } catch (err) {
-          console.error('Error fetching position:', err)
+          console.error('Error fetching position', i, ':', err)
         }
       }
 
@@ -63,7 +120,7 @@ export function Pool() {
     }
 
     fetchPositions()
-  }, [address, positionCount])
+  }, [address, positionCount, publicClient])
 
   if (showAddLiquidity) {
     return (
