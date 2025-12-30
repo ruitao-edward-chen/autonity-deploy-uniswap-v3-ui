@@ -380,7 +380,6 @@ export function Swap() {
         isOpen={selectingToken !== null}
         onClose={() => setSelectingToken(null)}
         onSelect={handleTokenSelect}
-        excludeToken={selectingToken === 'input' ? tokenOut : tokenIn}
         includeNative
       />
     </div>
