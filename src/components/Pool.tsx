@@ -665,8 +665,6 @@ function PoolCard({ poolAddress, token0, token1, fee, onAddLiquidity }: PoolCard
           poolAddress={poolAddress}
           currentTick={currentTick}
           tickSpacing={tickSpacing}
-          decimals0={token0.decimals}
-          decimals1={token1.decimals}
           token0Symbol={token0.symbol}
           token1Symbol={token1.symbol}
         />

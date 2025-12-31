@@ -13,8 +13,6 @@ interface LiquidityDepthChartProps {
   poolAddress: string
   currentTick: number
   tickSpacing: number
-  decimals0: number
-  decimals1: number
   token0Symbol: string
   token1Symbol: string
 }
@@ -23,8 +21,6 @@ export function LiquidityDepthChart({
   poolAddress,
   currentTick,
   tickSpacing,
-  decimals0,
-  decimals1,
   token0Symbol,
   token1Symbol,
 }: LiquidityDepthChartProps) {
