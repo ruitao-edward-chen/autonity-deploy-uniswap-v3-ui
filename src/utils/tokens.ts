@@ -15,14 +15,14 @@ export const DEFAULT_TOKENS: Token[] = [
     symbol: 'WATN',
     name: 'Wrapped Auton',
     decimals: 18,
-    logoURI: '/watn.svg',
+    logoURI: '/atn.png',
   },
   {
     address: TOKENS.USDC.address,
     symbol: 'USDC.pol',
     name: 'USD Coin (Polygon Bridge)',
     decimals: 6,
-    logoURI: '/usdc.svg',
+    logoURI: '/usdc.png',
   },
 ]
 
@@ -32,7 +32,7 @@ export const NATIVE_ATN: Token = {
   symbol: 'ATN',
   name: 'Auton',
   decimals: 18,
-  logoURI: '/atn.svg',
+  logoURI: '/atn.png',
 }
 
 /**

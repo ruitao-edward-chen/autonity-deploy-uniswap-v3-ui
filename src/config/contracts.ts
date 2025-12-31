@@ -23,14 +23,14 @@ export const TOKENS = {
     symbol: 'WATN',
     name: 'Wrapped Auton',
     decimals: 18,
-    logoURI: '/watn.svg',
+    logoURI: '/atn.png',
   },
   USDC: {
     address: '0xA13C67173822D9b11354a9404f221A3331FBd8C7' as const,
     symbol: 'USDC.pol',
     name: 'USD Coin (Polygon Bridge)',
     decimals: 6,
-    logoURI: '/usdc.svg',
+    logoURI: '/usdc.png',
   },
 }
 
