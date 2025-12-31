@@ -248,6 +248,7 @@ body {
 
 .chain-icon {
   flex-shrink: 0;
+  border-radius: var(--radius-full);
 }
 
 .chain-name {

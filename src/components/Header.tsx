@@ -80,12 +80,7 @@ export function Header() {
               className={`chain-selector ${showChainDropdown ? 'active' : ''}`}
               onClick={() => setShowChainDropdown(!showChainDropdown)}
             >
-              <svg className="chain-icon" width="20" height="20" viewBox="0 0 32 32" fill="none">
-                <circle cx="16" cy="16" r="14" fill="#ffffff" stroke="#e0e0e0" strokeWidth="1"/>
-                <path d="M20 12c-1-2-3-3-5-3-3 0-5 2-5 5s2 5 5 5c1.5 0 3-.5 4-1.5" stroke="#000" strokeWidth="2" fill="none" strokeLinecap="round"/>
-                <path d="M20 12v10" stroke="#000" strokeWidth="2" strokeLinecap="round"/>
-                <line x1="8" y1="17" x2="24" y2="17" stroke="#000" strokeWidth="1.5"/>
-              </svg>
+              <img className="chain-icon" src="/autonity.png" alt="Autonity" width="20" height="20" />
               <span className="chain-name">Autonity</span>
               <svg className={`chain-chevron ${showChainDropdown ? 'rotated' : ''}`} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="6 9 12 15 18 9"></polyline>
@@ -97,12 +92,7 @@ export function Header() {
                 <div className="chain-dropdown-backdrop" onClick={() => setShowChainDropdown(false)} />
                 <div className="chain-dropdown">
                   <button className="chain-option selected" onClick={() => setShowChainDropdown(false)}>
-                    <svg className="chain-icon" width="24" height="24" viewBox="0 0 32 32" fill="none">
-                      <circle cx="16" cy="16" r="14" fill="#ffffff" stroke="#e0e0e0" strokeWidth="1"/>
-                      <path d="M20 12c-1-2-3-3-5-3-3 0-5 2-5 5s2 5 5 5c1.5 0 3-.5 4-1.5" stroke="#000" strokeWidth="2" fill="none" strokeLinecap="round"/>
-                      <path d="M20 12v10" stroke="#000" strokeWidth="2" strokeLinecap="round"/>
-                      <line x1="8" y1="17" x2="24" y2="17" stroke="#000" strokeWidth="1.5"/>
-                    </svg>
+                    <img className="chain-icon" src="/autonity.png" alt="Autonity" width="24" height="24" />
                     <div className="chain-option-info">
                       <span className="chain-option-name">Autonity</span>
                       <span className="chain-option-type">Mainnet</span>
