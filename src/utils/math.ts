@@ -16,7 +16,6 @@ export const MAX_TICK = 887272
 
 // Q96 = 2^96 - Used in sqrtPriceX96 calculations
 const Q96 = 2n ** 96n
-const Q192 = 2n ** 192n
 
 /**
  * Check if tick value is safe for price calculations

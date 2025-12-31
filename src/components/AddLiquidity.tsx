@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useBalance } from 'wagmi'
-import { parseUnits, formatUnits, encodeFunctionData } from 'viem'
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { parseUnits, encodeFunctionData } from 'viem'
 import { TokenInput } from './TokenInput'
 import { TokenSelectModal } from './TokenSelectModal'
 import { DEFAULT_TOKENS, sortTokens, type Token } from '../utils/tokens'
@@ -9,7 +9,6 @@ import { ERC20_ABI, POSITION_MANAGER_ABI, POOL_ABI, FACTORY_ABI } from '../confi
 import { 
   nearestUsableTick, 
   priceToTick, 
-  tickToPrice, 
   MIN_TICK, 
   MAX_TICK,
   getDeadline,
@@ -17,7 +16,6 @@ import {
   sqrtPriceX96ToPrice,
   priceToSqrtPriceX96,
   formatPrice,
-  isTickSafe,
   getDisplayPriceBounds
 } from '../utils/math'
 
@@ -73,9 +71,6 @@ export function AddLiquidity({ onBack, existingPosition, fixedPool }: AddLiquidi
   // Manage mode state
   const [manageTab, setManageTab] = useState<ManageTab>('increase')
   const [removePercent, setRemovePercent] = useState(50)
-  
-  // UI state
-  const [showPriceInputs, setShowPriceInputs] = useState(true)
   
   // Sort tokens for proper ordering
   const [token0, token1] = useMemo(() => sortTokens(tokenA, tokenB), [tokenA, tokenB])

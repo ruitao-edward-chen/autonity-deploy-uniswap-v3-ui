@@ -26,7 +26,6 @@ export function Liquidity() {
   const [showAddLiquidity, setShowAddLiquidity] = useState(false)
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(null)
   const [showClosedPositions, setShowClosedPositions] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const publicClient = usePublicClient()
 
   const fixedPool = POOLS.WATN_USDC
@@ -59,7 +58,6 @@ export function Liquidity() {
       }
 
       setIsLoading(true)
-      setError(null)
       const count = Number(positionCount)
       const fetchedPositions: Position[] = []
 
@@ -366,8 +364,8 @@ function PositionCard({ position, currentTick, onManage }: PositionCardProps) {
 
 interface PoolCardProps {
   poolAddress: string
-  token0: typeof TOKENS.USDC
-  token1: typeof TOKENS.WATN
+  token0: (typeof TOKENS)[keyof typeof TOKENS]
+  token1: (typeof TOKENS)[keyof typeof TOKENS]
   fee: number
   onAddLiquidity: () => void
 }
