@@ -81,9 +81,10 @@ export function Header() {
               onClick={() => setShowChainDropdown(!showChainDropdown)}
             >
               <svg className="chain-icon" width="20" height="20" viewBox="0 0 32 32" fill="none">
-                <circle cx="16" cy="16" r="14" fill="#1a1a2e" stroke="#4a4a6a" strokeWidth="2"/>
-                <text x="16" y="22" fontFamily="Arial, sans-serif" fontSize="16" fontWeight="bold" fill="#00d4aa" textAnchor="middle">α</text>
-                <line x1="8" y1="16" x2="24" y2="16" stroke="#00d4aa" strokeWidth="2"/>
+                <circle cx="16" cy="16" r="14" fill="#ffffff" stroke="#e0e0e0" strokeWidth="1"/>
+                <path d="M20 12c-1-2-3-3-5-3-3 0-5 2-5 5s2 5 5 5c1.5 0 3-.5 4-1.5" stroke="#000" strokeWidth="2" fill="none" strokeLinecap="round"/>
+                <path d="M20 12v10" stroke="#000" strokeWidth="2" strokeLinecap="round"/>
+                <line x1="8" y1="17" x2="24" y2="17" stroke="#000" strokeWidth="1.5"/>
               </svg>
               <span className="chain-name">Autonity</span>
               <svg className={`chain-chevron ${showChainDropdown ? 'rotated' : ''}`} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -97,9 +98,10 @@ export function Header() {
                 <div className="chain-dropdown">
                   <button className="chain-option selected" onClick={() => setShowChainDropdown(false)}>
                     <svg className="chain-icon" width="24" height="24" viewBox="0 0 32 32" fill="none">
-                      <circle cx="16" cy="16" r="14" fill="#1a1a2e" stroke="#4a4a6a" strokeWidth="2"/>
-                      <text x="16" y="22" fontFamily="Arial, sans-serif" fontSize="16" fontWeight="bold" fill="#00d4aa" textAnchor="middle">α</text>
-                      <line x1="8" y1="16" x2="24" y2="16" stroke="#00d4aa" strokeWidth="2"/>
+                      <circle cx="16" cy="16" r="14" fill="#ffffff" stroke="#e0e0e0" strokeWidth="1"/>
+                      <path d="M20 12c-1-2-3-3-5-3-3 0-5 2-5 5s2 5 5 5c1.5 0 3-.5 4-1.5" stroke="#000" strokeWidth="2" fill="none" strokeLinecap="round"/>
+                      <path d="M20 12v10" stroke="#000" strokeWidth="2" strokeLinecap="round"/>
+                      <line x1="8" y1="17" x2="24" y2="17" stroke="#000" strokeWidth="1.5"/>
                     </svg>
                     <div className="chain-option-info">
                       <span className="chain-option-name">Autonity</span>
