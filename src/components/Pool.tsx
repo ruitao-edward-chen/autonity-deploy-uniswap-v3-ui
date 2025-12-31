@@ -386,7 +386,7 @@ function PriceRangeBar({
 }
 
 function PositionCard({ position, currentTick, onManage }: PositionCardProps) {
-  const { priceLower, priceUpper, isFullRange } = getDisplayPriceBounds(
+  const { priceLower, priceUpper, isFullRange, needsInversion } = getDisplayPriceBounds(
     position.tickLower,
     position.tickUpper,
     position.token0.decimals,
@@ -396,18 +396,20 @@ function PositionCard({ position, currentTick, onManage }: PositionCardProps) {
   // Calculate current price from tick for display
   const currentPriceFromTick = useMemo(() => {
     if (currentTick === null) return null
-    // Use sqrtPriceX96ToPrice logic but from tick
-    // price = 1.0001^tick * 10^(decimals0 - decimals1)
     try {
       const rawPrice = Math.pow(1.0001, currentTick)
       const price = rawPrice * Math.pow(10, position.token0.decimals - position.token1.decimals)
-      // Handle inverted prices
-      if (price > 1e12) return formatPrice(1 / price)
-      return formatPrice(price)
+      // If position prices needed inversion, current price display should match
+      const displayPrice = price > 1e6 ? 1 / price : price
+      return formatPrice(displayPrice)
     } catch {
       return null
     }
   }, [currentTick, position.token0.decimals, position.token1.decimals])
+
+  // For inverted positions, swap the token labels
+  const priceToken0 = needsInversion ? position.token1.symbol : position.token0.symbol
+  const priceToken1 = needsInversion ? position.token0.symbol : position.token1.symbol
 
   const feeTier = FEE_TIERS.find(f => f.fee === position.fee)
 
@@ -436,12 +438,12 @@ function PositionCard({ position, currentTick, onManage }: PositionCardProps) {
             tickLower={position.tickLower}
             tickUpper={position.tickUpper}
             currentTick={currentTick}
-            token0Symbol={position.token0.symbol}
-            token1Symbol={position.token1.symbol}
+            token0Symbol={priceToken0}
+            token1Symbol={priceToken1}
           />
           {currentPriceFromTick && (
             <div className="current-price-value">
-              Current: <strong>{currentPriceFromTick}</strong> {position.token1.symbol}/{position.token0.symbol}
+              Current: <strong>{currentPriceFromTick}</strong> {priceToken1}/{priceToken0}
             </div>
           )}
         </>
@@ -455,14 +457,14 @@ function PositionCard({ position, currentTick, onManage }: PositionCardProps) {
         <div className="range-item">
           <span className="range-label">Min Price</span>
           <span className="range-value">
-            {priceLower} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--color-text-tertiary)' }}>{position.token1.symbol}/{position.token0.symbol}</span>
+            {priceLower} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--color-text-tertiary)' }}>{priceToken1}/{priceToken0}</span>
           </span>
         </div>
         <div className="range-arrow">↔</div>
         <div className="range-item">
           <span className="range-label">Max Price</span>
           <span className="range-value">
-            {priceUpper} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--color-text-tertiary)' }}>{position.token1.symbol}/{position.token0.symbol}</span>
+            {priceUpper} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--color-text-tertiary)' }}>{priceToken1}/{priceToken0}</span>
           </span>
         </div>
       </div>

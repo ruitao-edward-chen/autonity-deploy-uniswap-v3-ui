@@ -99,14 +99,20 @@ export function priceToSqrtPriceX96(
 
 /**
  * Get price bounds for display, handling extreme ticks safely
+ * 
+ * For tokens with very different decimals (like WATN 18 vs USDC 6), 
+ * the tick values and decimal factor interact to give the human-readable price.
+ * 
+ * If the position was created with swapped token order, the decimal factor
+ * needs to be inverted. We try both and use whichever gives reasonable prices.
  */
 export function getDisplayPriceBounds(
   tickLower: number,
   tickUpper: number,
   decimals0: number,
   decimals1: number
-): { priceLower: string; priceUpper: string; isFullRange: boolean } {
-  // More generous full-range detection - catches positions with extreme ticks
+): { priceLower: string; priceUpper: string; isFullRange: boolean; needsInversion: boolean } {
+  // More generous full-range detection
   const isFullRange = tickLower <= MIN_TICK + 1000 || tickUpper >= MAX_TICK - 1000
   
   if (isFullRange) {
@@ -114,33 +120,61 @@ export function getDisplayPriceBounds(
       priceLower: '0',
       priceUpper: '∞',
       isFullRange: true,
+      needsInversion: false,
     }
   }
   
-  const priceLower = tickToPrice(tickLower, decimals0, decimals1)
-  const priceUpper = tickToPrice(tickUpper, decimals0, decimals1)
+  // Calculate raw prices (before decimal adjustment)
+  const rawPriceLower = Math.pow(1.0001, tickLower)
+  const rawPriceUpper = Math.pow(1.0001, tickUpper)
   
-  // Handle extreme price values (likely wrong decimal handling or inverted)
-  const formatBoundPrice = (price: number | null, isLower: boolean): string => {
-    if (price === null) return isLower ? '~0' : '~∞'
-    
-    // If price is astronomically high, it's likely inverted - show the inverse
-    if (price > 1e12) {
-      const inverted = 1 / price
-      return formatPrice(inverted) + ' (inv)'
-    }
-    // If price is astronomically low
-    if (price < 1e-12 && price > 0) {
-      return isLower ? '~0' : formatPrice(price)
-    }
-    
-    return formatPrice(price)
+  // Try both decimal factor orientations
+  const decimalFactor = Math.pow(10, decimals0 - decimals1)
+  const invertedDecimalFactor = Math.pow(10, decimals1 - decimals0)
+  
+  // Option 1: Normal decimal factor (token1/token0)
+  const priceNormal = {
+    lower: rawPriceLower * decimalFactor,
+    upper: rawPriceUpper * decimalFactor,
+  }
+  
+  // Option 2: Inverted decimal factor (token0/token1) - for positions created with swapped order
+  // Also need to invert the prices (1/x) and swap bounds
+  const priceInverted = {
+    lower: rawPriceLower * invertedDecimalFactor,
+    upper: rawPriceUpper * invertedDecimalFactor,
+  }
+  
+  // Check which perspective gives reasonable prices (0.001 to 100000)
+  const isReasonable = (p: number) => Number.isFinite(p) && p >= 0.001 && p <= 100000
+  
+  const normalOk = isReasonable(priceNormal.lower) && isReasonable(priceNormal.upper)
+  const invertedOk = isReasonable(priceInverted.lower) && isReasonable(priceInverted.upper)
+  
+  let priceLower: number
+  let priceUpper: number
+  let needsInversion: boolean
+  
+  if (normalOk) {
+    priceLower = priceNormal.lower
+    priceUpper = priceNormal.upper
+    needsInversion = false
+  } else if (invertedOk) {
+    priceLower = priceInverted.lower
+    priceUpper = priceInverted.upper
+    needsInversion = true
+  } else {
+    // Neither works - use normal but they'll show as scientific notation
+    priceLower = priceNormal.lower
+    priceUpper = priceNormal.upper
+    needsInversion = false
   }
   
   return {
-    priceLower: formatBoundPrice(priceLower, true),
-    priceUpper: formatBoundPrice(priceUpper, false),
+    priceLower: formatPrice(priceLower),
+    priceUpper: formatPrice(priceUpper),
     isFullRange: false,
+    needsInversion,
   }
 }
 
