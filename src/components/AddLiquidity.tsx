@@ -60,6 +60,10 @@ export function AddLiquidity({ onBack, existingPosition, fixedPool }: AddLiquidi
   
   // Fee tier
   const [selectedFee, setSelectedFee] = useState(fixedPool?.fee ?? 3000)
+
+  const feeTierLabel = useMemo(() => {
+    return FEE_TIERS.find(t => t.fee === selectedFee)?.label || `${selectedFee / 10000}%`
+  }, [selectedFee])
   
   // Price range
   const [minPrice, setMinPrice] = useState('')
@@ -548,33 +552,43 @@ export function AddLiquidity({ onBack, existingPosition, fixedPool }: AddLiquidi
           <h2>{isManaging ? 'Manage Position' : (isFixedPool ? 'Add Liquidity (WATN / USDC)' : 'Add Liquidity')}</h2>
         </div>
 
+        {(isManaging || isFixedPool) && (
+          <div className="manage-position-summary">
+            <div className="manage-position-summary-row">
+              <div className="manage-position-summary-left">
+                <span className="token-pair">{token0.symbol} / {token1.symbol}</span>
+                <span className="fee-badge">{feeTierLabel}</span>
+              </div>
+              <span className="manage-position-summary-right">
+                {isManaging ? `NFT #${existingPosition?.tokenId.toString()}` : 'Fixed pool'}
+              </span>
+            </div>
+          </div>
+        )}
+
         {isManaging && (
-          <div style={{ display: 'flex', gap: 8, marginBottom: 'var(--spacing-lg)' }}>
+          <div className="manage-tabs">
             <button
-              className={`fee-tier-option ${manageTab === 'increase' ? 'selected' : ''}`}
+              type="button"
+              className={`manage-tab ${manageTab === 'increase' ? 'active' : ''}`}
               onClick={() => setManageTab('increase')}
             >
-              <span className="fee-label">Increase</span>
-              <span className="fee-desc">Add to this position</span>
+              Increase
             </button>
             <button
-              className={`fee-tier-option ${manageTab === 'remove' ? 'selected' : ''}`}
+              type="button"
+              className={`manage-tab ${manageTab === 'remove' ? 'active' : ''}`}
               onClick={() => setManageTab('remove')}
             >
-              <span className="fee-label">Remove</span>
-              <span className="fee-desc">Withdraw liquidity</span>
+              Remove
             </button>
           </div>
         )}
 
         {/* Fee Tier Selection */}
-        <div className="fee-tier-section">
-          <label className="section-label">{(isManaging || isFixedPool) ? 'Fee Tier (fixed)' : 'Select Fee Tier'}</label>
-          {(isManaging || isFixedPool) ? (
-            <div className="current-price" style={{ marginBottom: 0 }}>
-              <strong>{FEE_TIERS.find(t => t.fee === selectedFee)?.label || `${selectedFee / 10000}%`}</strong>
-            </div>
-          ) : (
+        {(!isManaging && !isFixedPool) && (
+          <div className="fee-tier-section">
+            <label className="section-label">Select Fee Tier</label>
             <div className="fee-tier-options">
               {FEE_TIERS.map(tier => (
                 <button
@@ -592,8 +606,8 @@ export function AddLiquidity({ onBack, existingPosition, fixedPool }: AddLiquidi
                 </button>
               ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Price Range */}
         <div className="price-range-section">
@@ -642,11 +656,7 @@ export function AddLiquidity({ onBack, existingPosition, fixedPool }: AddLiquidi
             </div>
           )}
 
-          {isFullRange && (
-            <div className="full-range-warning">
-              ⚠️ Full range positions may earn less fees due to lower capital efficiency
-            </div>
-          )}
+          {/* Full range warning removed by request */}
 
           {isManaging && (
             <div className="position-range" style={{ marginTop: 'var(--spacing-sm)' }}>
@@ -664,7 +674,7 @@ export function AddLiquidity({ onBack, existingPosition, fixedPool }: AddLiquidi
 
           {/* Position type indicator */}
           <div className={`position-type-indicator ${positionType}`}>
-            {positionType === 'in-range' && '✓ Price is in range - Both tokens required'}
+            {positionType === 'in-range' && 'Price is in range'}
             {positionType === 'above-range' && '↑ Price above range - Only ' + token0.symbol + ' required (one-sided)'}
             {positionType === 'below-range' && '↓ Price below range - Only ' + token1.symbol + ' required (one-sided)'}
             {positionType === 'full-range' && '∞ Full range position'}

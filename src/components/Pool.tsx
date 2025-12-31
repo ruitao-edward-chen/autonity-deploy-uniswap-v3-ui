@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAccount, useReadContract, usePublicClient } from 'wagmi'
 import { CONTRACTS, TOKENS, FEE_TIERS, POOLS } from '../config/contracts'
-import { POSITION_MANAGER_ABI, POOL_ABI } from '../config/abis'
+import { ERC20_ABI, POSITION_MANAGER_ABI, POOL_ABI } from '../config/abis'
 import { getDisplayPriceBounds, formatAmount, sqrtPriceX96ToPrice, formatPrice } from '../utils/math'
 import { DEFAULT_TOKENS, getTokenByAddress, type Token } from '../utils/tokens'
 import { AddLiquidity } from './AddLiquidity'
+import { formatUnits } from 'viem'
 
 interface Position {
   tokenId: bigint
@@ -24,12 +25,21 @@ export function Liquidity() {
   const [isLoading, setIsLoading] = useState(false)
   const [showAddLiquidity, setShowAddLiquidity] = useState(false)
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(null)
+  const [showClosedPositions, setShowClosedPositions] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const publicClient = usePublicClient()
 
   const fixedPool = POOLS.WATN_USDC
   const fixedTokenA = DEFAULT_TOKENS.find(t => t.symbol === 'WATN')!
   const fixedTokenB = DEFAULT_TOKENS.find(t => t.symbol === 'USDC.pol')!
+
+  const { data: fixedSlot0 } = useReadContract({
+    address: fixedPool.address,
+    abi: POOL_ABI,
+    functionName: 'slot0',
+  })
+
+  const currentTick = fixedSlot0 ? Number(fixedSlot0[1]) : null
 
   // Get number of positions owned
   const { data: positionCount } = useReadContract({
@@ -193,18 +203,52 @@ export function Liquidity() {
       )
     }
 
+    const activePositions = positions.filter(p => p.liquidity > 0n)
+    const closedPositions = positions.filter(p => p.liquidity === 0n)
+
     return (
       <div className="positions-list">
-        {positions.map(position => (
+        {activePositions.map(position => (
           <PositionCard 
             key={position.tokenId.toString()} 
             position={position}
+            currentTick={currentTick}
             onManage={() => {
               setSelectedPosition(position)
               setShowAddLiquidity(true)
             }}
           />
         ))}
+
+        {closedPositions.length > 0 && (
+          <div className="position-card">
+            <div className="position-header" style={{ marginBottom: showClosedPositions ? 'var(--spacing-md)' : 0 }}>
+              <div className="position-tokens">
+                <span className="token-pair">Closed positions</span>
+                <span className="fee-badge">{closedPositions.length}</span>
+              </div>
+              <button className="small-button" onClick={() => setShowClosedPositions(v => !v)}>
+                {showClosedPositions ? 'Hide' : 'Show'}
+              </button>
+            </div>
+
+            {showClosedPositions && (
+              <div className="positions-list" style={{ gap: 'var(--spacing-sm)' }}>
+                {closedPositions.map(position => (
+                  <PositionCard 
+                    key={position.tokenId.toString()} 
+                    position={position}
+                    currentTick={currentTick}
+                    onManage={() => {
+                      setSelectedPosition(position)
+                      setShowAddLiquidity(true)
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     )
   }
@@ -215,7 +259,7 @@ export function Liquidity() {
         <div className="pool-header">
           <h2>Liquidity (WATN / USDC)</h2>
           <button 
-            className="add-liquidity-button"
+            className="pool-header-action-button"
             onClick={() => {
               setSelectedPosition(null)
               setShowAddLiquidity(true)
@@ -249,10 +293,11 @@ export function Liquidity() {
 
 interface PositionCardProps {
   position: Position
+  currentTick: number | null
   onManage: () => void
 }
 
-function PositionCard({ position, onManage }: PositionCardProps) {
+function PositionCard({ position, currentTick, onManage }: PositionCardProps) {
   const { priceLower, priceUpper, isFullRange } = getDisplayPriceBounds(
     position.tickLower,
     position.tickUpper,
@@ -261,6 +306,10 @@ function PositionCard({ position, onManage }: PositionCardProps) {
   )
 
   const feeTier = FEE_TIERS.find(f => f.fee === position.fee)
+
+  const hasLiquidity = position.liquidity > 0n
+  const isInRange = currentTick !== null && currentTick >= position.tickLower && currentTick < position.tickUpper
+  const statusText = !hasLiquidity ? 'Closed' : (currentTick === null ? 'Active' : (isInRange ? 'In Range' : 'Out of Range'))
 
   return (
     <div className="position-card">
@@ -272,19 +321,23 @@ function PositionCard({ position, onManage }: PositionCardProps) {
           <span className="fee-badge">{feeTier?.label || `${position.fee / 10000}%`}</span>
         </div>
         <span className={`position-status ${position.liquidity > 0n ? 'active' : 'closed'}`}>
-          {position.liquidity > 0n ? 'In Range' : 'Closed'}
+          {statusText}
         </span>
       </div>
 
       <div className="position-range">
         <div className="range-item">
           <span className="range-label">Min Price</span>
-          <span className="range-value">{priceLower}</span>
+          <span className="range-value">
+            {priceLower} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--color-text-tertiary)' }}>{position.token1.symbol}/{position.token0.symbol}</span>
+          </span>
         </div>
         <div className="range-arrow">↔</div>
         <div className="range-item">
           <span className="range-label">Max Price</span>
-          <span className="range-value">{priceUpper}</span>
+          <span className="range-value">
+            {priceUpper} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--color-text-tertiary)' }}>{position.token1.symbol}/{position.token0.symbol}</span>
+          </span>
         </div>
       </div>
 
@@ -293,7 +346,7 @@ function PositionCard({ position, onManage }: PositionCardProps) {
       )}
 
       <div className="position-liquidity">
-        <span>Liquidity: {formatAmount(position.liquidity, 0)}</span>
+        <span>Liquidity (raw): {formatCompactBigint(position.liquidity)}</span>
       </div>
 
       {(position.tokensOwed0 > 0n || position.tokensOwed1 > 0n) && (
@@ -326,15 +379,48 @@ function PoolCard({ poolAddress, token0, token1, fee, onAddLiquidity }: PoolCard
     functionName: 'slot0',
   })
 
-  const { data: liquidity } = useReadContract({
-    address: poolAddress as `0x${string}`,
-    abi: POOL_ABI,
-    functionName: 'liquidity',
+  const { data: token0Balance } = useReadContract({
+    address: token0.address as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: 'balanceOf',
+    args: [poolAddress as `0x${string}`],
+  })
+
+  const { data: token1Balance } = useReadContract({
+    address: token1.address as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: 'balanceOf',
+    args: [poolAddress as `0x${string}`],
   })
 
   const currentPrice = slot0 
     ? sqrtPriceX96ToPrice(slot0[0] as bigint, token0.decimals, token1.decimals)
     : null
+
+  const approxTvlToken1 = useMemo(() => {
+    if (!slot0 || token0Balance === undefined || token1Balance === undefined) return null
+
+    const sqrtPriceX96 = slot0[0] as bigint
+    const Q192 = 2n ** 192n
+    const priceX192 = sqrtPriceX96 * sqrtPriceX96
+
+    // value of token0 balance expressed in token1 raw units:
+    // token0Value1Raw = token0Raw * (priceX192 / Q192)
+    const token0ValueInToken1 = (token0Balance as bigint) * priceX192 / Q192
+    const tvlToken1Raw = (token1Balance as bigint) + token0ValueInToken1
+
+    return trimDecimals(formatUnits(tvlToken1Raw, token1.decimals), 2)
+  }, [slot0, token0Balance, token1Balance, token1.decimals])
+
+  const token0BalanceDisplay = useMemo(() => {
+    if (token0Balance === undefined) return null
+    return trimDecimals(formatUnits(token0Balance as bigint, token0.decimals), 4)
+  }, [token0Balance, token0.decimals])
+
+  const token1BalanceDisplay = useMemo(() => {
+    if (token1Balance === undefined) return null
+    return trimDecimals(formatUnits(token1Balance as bigint, token1.decimals), 2)
+  }, [token1Balance, token1.decimals])
 
   const feeTier = FEE_TIERS.find(f => f.fee === fee)
 
@@ -359,9 +445,17 @@ function PoolCard({ poolAddress, token0, token1, fee, onAddLiquidity }: PoolCard
           </span>
         </div>
         <div className="pool-stat">
-          <span className="stat-label">TVL</span>
+          <span className="stat-label">Pool balances</span>
           <span className="stat-value">
-            {liquidity ? formatAmount(liquidity as bigint, 0) : '—'}
+            {token0BalanceDisplay !== null && token1BalanceDisplay !== null
+              ? `${token0BalanceDisplay} ${token0.symbol} + ${token1BalanceDisplay} ${token1.symbol}`
+              : '—'}
+          </span>
+        </div>
+        <div className="pool-stat">
+          <span className="stat-label">Approx. TVL</span>
+          <span className="stat-value">
+            {approxTvlToken1 !== null ? `${approxTvlToken1} ${token1.symbol}` : '—'}
           </span>
         </div>
       </div>
@@ -371,4 +465,37 @@ function PoolCard({ poolAddress, token0, token1, fee, onAddLiquidity }: PoolCard
       </button>
     </div>
   )
+}
+
+function trimDecimals(value: string, maxDecimals: number): string {
+  if (!value.includes('.') || maxDecimals <= 0) return value
+  const [i, f = ''] = value.split('.')
+  const cut = f.slice(0, maxDecimals).replace(/0+$/, '')
+  return cut ? `${i}.${cut}` : i
+}
+
+function formatCompactBigint(value: bigint): string {
+  const abs = value < 0n ? -value : value
+  const sign = value < 0n ? '-' : ''
+
+  const units: Array<{ v: bigint; s: string }> = [
+    { v: 1_000_000_000_000_000_000n, s: 'E' },
+    { v: 1_000_000_000_000_000n, s: 'P' },
+    { v: 1_000_000_000_000n, s: 'T' },
+    { v: 1_000_000_000n, s: 'B' },
+    { v: 1_000_000n, s: 'M' },
+    { v: 1_000n, s: 'K' },
+  ]
+
+  for (const u of units) {
+    if (abs >= u.v) {
+      const whole = abs / u.v
+      const remainder = abs % u.v
+      const oneDecimal = (remainder * 10n) / u.v
+      if (whole >= 100n || oneDecimal === 0n) return `${sign}${whole.toString()}${u.s}`
+      return `${sign}${whole.toString()}.${oneDecimal.toString()}${u.s}`
+    }
+  }
+
+  return `${sign}${abs.toString()}`
 }
