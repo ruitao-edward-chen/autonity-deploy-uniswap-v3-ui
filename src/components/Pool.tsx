@@ -293,7 +293,7 @@ export function Liquidity() {
                 setShowAddLiquidity(true)
               }}
             >
-              + Add Liquidity
+              + Add
             </button>
           </div>
         </div>
