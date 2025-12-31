@@ -91,6 +91,11 @@
   padding: 0;
 }
 
+html {
+  background: var(--color-bg-primary);
+  min-height: 100%;
+}
+
 body {
   font-family: var(--font-family);
   background: var(--color-bg-page);
@@ -99,6 +104,10 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background 0.3s ease, color 0.3s ease;
+}
+
+#root {
+  min-height: 100vh;
 }
 
 .app {
@@ -2262,8 +2271,16 @@ body {
   }
 
   .chain-selector {
-    padding: var(--spacing-xs);
-    height: 36px;
+    padding: var(--spacing-sm);
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-full);
+    justify-content: center;
+  }
+
+  .chain-selector .chain-icon {
+    width: 24px;
+    height: 24px;
   }
 
   .chain-name {
