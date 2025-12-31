@@ -295,6 +295,96 @@ interface PositionCardProps {
   onManage: () => void
 }
 
+// Visual price range bar component
+function PriceRangeBar({ 
+  tickLower, 
+  tickUpper, 
+  currentTick,
+  token0Symbol,
+  token1Symbol,
+}: { 
+  tickLower: number
+  tickUpper: number
+  currentTick: number | null
+  token0Symbol: string
+  token1Symbol: string
+}) {
+  // Calculate position of current price within the range
+  // We'll show a wider view: 20% padding on each side of the range
+  const rangeTicks = tickUpper - tickLower
+  const paddingTicks = Math.max(rangeTicks * 0.3, 1000) // At least 1000 ticks padding
+  
+  const viewMin = tickLower - paddingTicks
+  const viewMax = tickUpper + paddingTicks
+  const viewRange = viewMax - viewMin
+
+  // Calculate percentages for the bar
+  const rangeStart = ((tickLower - viewMin) / viewRange) * 100
+  const rangeEnd = ((tickUpper - viewMin) / viewRange) * 100
+  const rangeWidth = rangeEnd - rangeStart
+
+  // Current price position
+  const currentPos = currentTick !== null 
+    ? Math.max(0, Math.min(100, ((currentTick - viewMin) / viewRange) * 100))
+    : null
+
+  const isInRange = currentTick !== null && currentTick >= tickLower && currentTick < tickUpper
+  const isBelowRange = currentTick !== null && currentTick < tickLower
+  const isAboveRange = currentTick !== null && currentTick >= tickUpper
+
+  return (
+    <div className="price-range-visual">
+      <div className="range-bar-container">
+        {/* Background track */}
+        <div className="range-bar-track" />
+        
+        {/* Active range highlight */}
+        <div 
+          className={`range-bar-active ${isInRange ? 'in-range' : 'out-of-range'}`}
+          style={{ 
+            left: `${rangeStart}%`, 
+            width: `${rangeWidth}%` 
+          }}
+        />
+        
+        {/* Range boundary markers */}
+        <div 
+          className="range-boundary range-boundary-min"
+          style={{ left: `${rangeStart}%` }}
+        />
+        <div 
+          className="range-boundary range-boundary-max"
+          style={{ left: `${rangeEnd}%` }}
+        />
+        
+        {/* Current price marker */}
+        {currentPos !== null && (
+          <div 
+            className={`current-price-marker ${isInRange ? 'in-range' : 'out-of-range'}`}
+            style={{ left: `${currentPos}%` }}
+          >
+            <div className="price-marker-line" />
+            <div className="price-marker-dot" />
+          </div>
+        )}
+      </div>
+      
+      {/* Labels */}
+      <div className="range-bar-labels">
+        <span className="range-label-text">
+          {isBelowRange && '← Price below range'}
+          {isAboveRange && 'Price above range →'}
+          {isInRange && '● Current price in range'}
+          {currentTick === null && 'Loading...'}
+        </span>
+        <span className="range-label-hint">
+          {token1Symbol}/{token0Symbol}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 function PositionCard({ position, currentTick, onManage }: PositionCardProps) {
   const { priceLower, priceUpper, isFullRange } = getDisplayPriceBounds(
     position.tickLower,
@@ -318,10 +408,25 @@ function PositionCard({ position, currentTick, onManage }: PositionCardProps) {
           </span>
           <span className="fee-badge">{feeTier?.label || `${position.fee / 10000}%`}</span>
         </div>
-        <span className={`position-status ${position.liquidity > 0n ? 'active' : 'closed'}`}>
+        <span className={`position-status ${hasLiquidity ? (isInRange ? 'active' : 'out-of-range') : 'closed'}`}>
           {statusText}
         </span>
       </div>
+
+      {/* Visual Price Range Bar */}
+      {!isFullRange && hasLiquidity && (
+        <PriceRangeBar
+          tickLower={position.tickLower}
+          tickUpper={position.tickUpper}
+          currentTick={currentTick}
+          token0Symbol={position.token0.symbol}
+          token1Symbol={position.token1.symbol}
+        />
+      )}
+
+      {isFullRange && (
+        <div className="full-range-badge">∞ Full Range Position — Earns fees at any price</div>
+      )}
 
       <div className="position-range">
         <div className="range-item">
@@ -339,12 +444,8 @@ function PositionCard({ position, currentTick, onManage }: PositionCardProps) {
         </div>
       </div>
 
-      {isFullRange && (
-        <div className="full-range-badge">Full Range Position</div>
-      )}
-
       <div className="position-liquidity">
-        <span>Liquidity (raw): {formatCompactBigint(position.liquidity)}</span>
+        <span>Liquidity: {formatCompactBigint(position.liquidity)}</span>
       </div>
 
       {(position.tokensOwed0 > 0n || position.tokensOwed1 > 0n) && (
@@ -420,6 +521,22 @@ function PoolCard({ poolAddress, token0, token1, fee, onAddLiquidity }: PoolCard
     return trimDecimals(formatUnits(token1Balance as bigint, token1.decimals), 2)
   }, [token1Balance, token1.decimals])
 
+  // Calculate token ratio for visualization
+  const tokenRatio = useMemo(() => {
+    if (token0Balance === undefined || token1Balance === undefined || !currentPrice) return null
+    
+    const t0Val = parseFloat(formatUnits(token0Balance as bigint, token0.decimals)) * currentPrice
+    const t1Val = parseFloat(formatUnits(token1Balance as bigint, token1.decimals))
+    const total = t0Val + t1Val
+    
+    if (total === 0) return { token0Pct: 50, token1Pct: 50 }
+    
+    return {
+      token0Pct: Math.round((t0Val / total) * 100),
+      token1Pct: Math.round((t1Val / total) * 100),
+    }
+  }, [token0Balance, token1Balance, token0.decimals, token1.decimals, currentPrice])
+
   const feeTier = FEE_TIERS.find(f => f.fee === fee)
 
   return (
@@ -427,35 +544,54 @@ function PoolCard({ poolAddress, token0, token1, fee, onAddLiquidity }: PoolCard
       <div className="pool-item-header">
         <div className="pool-tokens">
           <div className="token-icons">
-            <div className="token-icon" style={{ backgroundColor: '#2775ca' }}>U</div>
-            <div className="token-icon" style={{ backgroundColor: '#6366f1', marginLeft: '-8px' }}>W</div>
+            <div className="token-icon" style={{ backgroundColor: '#6366f1' }}>W</div>
+            <div className="token-icon" style={{ backgroundColor: '#2775ca', marginLeft: '-8px' }}>U</div>
           </div>
           <span className="pool-pair">{token0.symbol} / {token1.symbol}</span>
           <span className="fee-badge">{feeTier?.label}</span>
         </div>
       </div>
 
-      <div className="pool-stats">
-        <div className="pool-stat">
-          <span className="stat-label">Current Price</span>
-          <span className="stat-value">
-            {currentPrice !== null ? formatPrice(currentPrice) : '—'} {token1.symbol} per {token0.symbol}
-          </span>
+      {/* Current Price Display */}
+      <div className="pool-price-display">
+        <div className="price-main">
+          <span className="price-value">{currentPrice !== null ? formatPrice(currentPrice) : '—'}</span>
+          <span className="price-unit">{token1.symbol} per {token0.symbol}</span>
         </div>
-        <div className="pool-stat">
-          <span className="stat-label">Pool balances</span>
-          <span className="stat-value">
-            {token0BalanceDisplay !== null && token1BalanceDisplay !== null
-              ? `${token0BalanceDisplay} ${token0.symbol} + ${token1BalanceDisplay} ${token1.symbol}`
-              : '—'}
-          </span>
+      </div>
+
+      {/* Token Composition Bar */}
+      {tokenRatio && (
+        <div className="pool-composition">
+          <div className="composition-bar">
+            <div 
+              className="composition-segment token0"
+              style={{ width: `${tokenRatio.token0Pct}%` }}
+            />
+            <div 
+              className="composition-segment token1"
+              style={{ width: `${tokenRatio.token1Pct}%` }}
+            />
+          </div>
+          <div className="composition-labels">
+            <span className="comp-label">
+              <span className="comp-dot token0" />
+              {token0BalanceDisplay} {token0.symbol} ({tokenRatio.token0Pct}%)
+            </span>
+            <span className="comp-label">
+              <span className="comp-dot token1" />
+              {token1BalanceDisplay} {token1.symbol} ({tokenRatio.token1Pct}%)
+            </span>
+          </div>
         </div>
-        <div className="pool-stat">
-          <span className="stat-label">Approx. TVL</span>
-          <span className="stat-value">
-            {approxTvlToken1 !== null ? `${approxTvlToken1} ${token1.symbol}` : '—'}
-          </span>
-        </div>
+      )}
+
+      {/* TVL */}
+      <div className="pool-tvl">
+        <span className="tvl-label">Total Value Locked</span>
+        <span className="tvl-value">
+          {approxTvlToken1 !== null ? `≈ ${approxTvlToken1} ${token1.symbol}` : '—'}
+        </span>
       </div>
 
       <button className="pool-add-button" onClick={onAddLiquidity}>
