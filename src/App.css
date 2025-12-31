@@ -246,6 +246,93 @@ body {
 .chain-chevron {
   opacity: 0.5;
   flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.chain-chevron.rotated {
+  transform: rotate(180deg);
+}
+
+.chain-selector-wrapper {
+  position: relative;
+}
+
+.chain-selector.active {
+  border-color: var(--color-primary);
+  background: var(--color-bg-primary);
+}
+
+.chain-dropdown-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 99;
+}
+
+.chain-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 220px;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 100;
+  overflow: hidden;
+}
+
+.chain-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.chain-option:hover {
+  background: var(--color-bg-secondary);
+}
+
+.chain-option.selected {
+  background: var(--color-primary-light);
+}
+
+.chain-option-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.chain-option-name {
+  font-weight: 600;
+  color: var(--color-text-primary);
+  font-size: 0.9375rem;
+}
+
+.chain-option-type {
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+}
+
+.chain-check {
+  color: var(--color-primary);
+}
+
+.chain-dropdown-footer {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-top: 1px solid var(--color-border);
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
 }
 
 .wallet-section {
@@ -916,8 +1003,8 @@ body {
   width: 36px;
   height: 36px;
   border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-primary);
+  border: none;
+  background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
   display: flex;
@@ -929,16 +1016,11 @@ body {
 .refresh-button:hover {
   background: var(--color-bg-secondary);
   color: var(--color-text-primary);
-  border-color: var(--color-primary);
 }
 
 .refresh-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-.refresh-button svg.spinning {
-  animation: spin 1s linear infinite;
 }
 
 .small-button {

@@ -273,18 +273,22 @@ export function Liquidity() {
               disabled={isRefreshing}
               title="Refresh positions"
             >
-              <svg 
-                width="16" 
-                height="16" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2"
-                className={isRefreshing ? 'spinning' : ''}
-              >
-                <path d="M21 12a9 9 0 11-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
-                <path d="M21 3v5h-5" />
-              </svg>
+              {isRefreshing ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <g>
+                    <circle cx="12" cy="12" r="9" strokeOpacity="0.35" />
+                    <path d="M21 12a9 9 0 0 1-9 9" />
+                    <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.9s" repeatCount="indefinite" />
+                  </g>
+                </svg>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="23 4 23 10 17 10" />
+                  <polyline points="1 20 1 14 7 14" />
+                  <path d="M3.51 9a9 9 0 0 1 14.13-3.36L23 10" />
+                  <path d="M1 14l5.37 4.36A9 9 0 0 0 20.49 15" />
+                </svg>
+              )}
             </button>
             <button 
               className="pool-add-button-header"

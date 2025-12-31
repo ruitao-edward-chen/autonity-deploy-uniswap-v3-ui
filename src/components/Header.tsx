@@ -8,6 +8,7 @@ export function Header() {
   const { disconnect } = useDisconnect()
   const { data: balance } = useBalance({ address })
   const [showWalletModal, setShowWalletModal] = useState(false)
+  const [showChainDropdown, setShowChainDropdown] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const stored = localStorage.getItem('theme')
     if (stored) return stored === 'dark'
@@ -74,16 +75,45 @@ export function Header() {
           </button>
 
           {/* Chain Selector */}
-          <button className="chain-selector">
-            <svg className="chain-icon" width="20" height="20" viewBox="0 0 32 32" fill="none">
-              <circle cx="16" cy="16" r="14" fill="#1a1a2e" stroke="#4a4a6a" strokeWidth="2"/>
-              <path d="M16 6L22 16L16 26L10 16L16 6Z" fill="#00d4aa"/>
-            </svg>
-            <span className="chain-name">Autonity</span>
-            <svg className="chain-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-          </button>
+          <div className="chain-selector-wrapper">
+            <button 
+              className={`chain-selector ${showChainDropdown ? 'active' : ''}`}
+              onClick={() => setShowChainDropdown(!showChainDropdown)}
+            >
+              <svg className="chain-icon" width="20" height="20" viewBox="0 0 32 32" fill="none">
+                <circle cx="16" cy="16" r="14" fill="#1a1a2e" stroke="#4a4a6a" strokeWidth="2"/>
+                <path d="M16 6L22 16L16 26L10 16L16 6Z" fill="#00d4aa"/>
+              </svg>
+              <span className="chain-name">Autonity</span>
+              <svg className={`chain-chevron ${showChainDropdown ? 'rotated' : ''}`} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            
+            {showChainDropdown && (
+              <>
+                <div className="chain-dropdown-backdrop" onClick={() => setShowChainDropdown(false)} />
+                <div className="chain-dropdown">
+                  <button className="chain-option selected" onClick={() => setShowChainDropdown(false)}>
+                    <svg className="chain-icon" width="24" height="24" viewBox="0 0 32 32" fill="none">
+                      <circle cx="16" cy="16" r="14" fill="#1a1a2e" stroke="#4a4a6a" strokeWidth="2"/>
+                      <path d="M16 6L22 16L16 26L10 16L16 6Z" fill="#00d4aa"/>
+                    </svg>
+                    <div className="chain-option-info">
+                      <span className="chain-option-name">Autonity</span>
+                      <span className="chain-option-type">Mainnet</span>
+                    </div>
+                    <svg className="chain-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  </button>
+                  <div className="chain-dropdown-footer">
+                    <span>More chains coming soon</span>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
 
           {/* Wallet Section */}
           <div className="wallet-section">
