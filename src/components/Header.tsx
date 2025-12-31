@@ -11,7 +11,12 @@ export function Header() {
     <header className="header">
       <div className="header-content">
         <div className="logo">
-          <span className="logo-text">Uniswap V3 on Autonity</span>
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="32" height="32" rx="6" fill="white"/>
+            <rect x="0.5" y="0.5" width="31" height="31" rx="5.5" stroke="#0052ff" strokeOpacity="0.2"/>
+            <text x="16" y="24" fontFamily="Arial, sans-serif" fontSize="20" fontWeight="bold" fill="#0052ff" textAnchor="middle">森</text>
+          </svg>
+          <span className="logo-text">Mori</span>
         </div>
 
         <div className="wallet-section">
