@@ -9,13 +9,6 @@ interface TickData {
   liquidityGross: bigint
 }
 
-interface LiquidityBar {
-  tick: number
-  price: number
-  liquidity: bigint
-  isCurrentTick: boolean
-}
-
 interface LiquidityDepthChartProps {
   poolAddress: string
   currentTick: number
@@ -54,8 +47,14 @@ export function LiquidityDepthChart({
         const ticksPerWord = 256 * tickSpacing
         const currentWordIndex = Math.floor(currentTick / ticksPerWord)
         
-        // Fetch 3 words around current price (covers ~768 * tickSpacing ticks)
-        const wordIndices = [currentWordIndex - 1, currentWordIndex, currentWordIndex + 1]
+        // Fetch 5 words around current price for wider coverage
+        const wordIndices = [
+          currentWordIndex - 2,
+          currentWordIndex - 1,
+          currentWordIndex,
+          currentWordIndex + 1,
+          currentWordIndex + 2,
+        ]
         
         const allTicks: TickData[] = []
         
@@ -97,57 +96,116 @@ export function LiquidityDepthChart({
     fetchTickData()
   }, [publicClient, poolAddress, currentTick, tickSpacing])
 
-  // Calculate liquidity at each tick level
-  const liquidityBars = useMemo(() => {
-    if (tickData.length === 0) return []
-    
-    const bars: LiquidityBar[] = []
-    let currentLiquidity = 0n
-    
-    // Calculate decimal factor for price display
-    const decimalFactor = Math.pow(10, decimals0 - decimals1)
-    const invertedDecimalFactor = Math.pow(10, decimals1 - decimals0)
-    
-    // Determine which decimal factor to use based on tick sign
-    // If current tick is positive and large, we need inverted factor
-    const useInvertedFactor = currentTick > 100000
-    const factor = useInvertedFactor ? invertedDecimalFactor : decimalFactor
+  // Process tick data into liquidity distribution
+  const { liquidityByTick, minTick, maxTick, maxLiquidity } = useMemo(() => {
+    if (tickData.length === 0) {
+      return { liquidityByTick: new Map(), minTick: 0, maxTick: 0, maxLiquidity: 1n }
+    }
     
     // Build cumulative liquidity from lowest tick
+    const liquidityMap = new Map<number, bigint>()
+    let runningLiquidity = 0n
+    
+    // First pass: calculate liquidity at each initialized tick
     for (const tick of tickData) {
-      currentLiquidity += tick.liquidityNet
+      runningLiquidity += tick.liquidityNet
+      liquidityMap.set(tick.tick, runningLiquidity > 0n ? runningLiquidity : 0n)
+    }
+    
+    // Find range that includes current tick
+    const allTicks = Array.from(liquidityMap.keys()).sort((a, b) => a - b)
+    const tickMin = Math.min(...allTicks, currentTick - tickSpacing * 50)
+    const tickMax = Math.max(...allTicks, currentTick + tickSpacing * 50)
+    
+    // Find max liquidity for scaling
+    let maxLiq = 1n
+    for (const liq of liquidityMap.values()) {
+      if (liq > maxLiq) maxLiq = liq
+    }
+    
+    return {
+      liquidityByTick: liquidityMap,
+      minTick: tickMin,
+      maxTick: tickMax,
+      maxLiquidity: maxLiq,
+    }
+  }, [tickData, currentTick, tickSpacing])
+
+  // Create display buckets for the chart
+  const chartBuckets = useMemo(() => {
+    const NUM_BUCKETS = 40
+    const buckets: Array<{
+      tickStart: number
+      tickEnd: number
+      liquidity: bigint
+      containsCurrent: boolean
+      position: 'left' | 'current' | 'right'
+    }> = []
+    
+    const totalRange = maxTick - minTick
+    if (totalRange <= 0) return buckets
+    
+    const bucketSize = Math.ceil(totalRange / NUM_BUCKETS)
+    
+    // Get sorted tick data for interpolation
+    const sortedTicks = Array.from(liquidityByTick.entries()).sort((a, b) => a[0] - b[0])
+    
+    for (let i = 0; i < NUM_BUCKETS; i++) {
+      const tickStart = minTick + i * bucketSize
+      const tickEnd = tickStart + bucketSize
+      const containsCurrent = currentTick >= tickStart && currentTick < tickEnd
       
-      const rawPrice = Math.pow(1.0001, tick.tick)
-      const price = rawPrice * factor
+      // Find liquidity at this bucket (use the tick just before this range)
+      let bucketLiquidity = 0n
+      for (const [tick, liq] of sortedTicks) {
+        if (tick <= tickStart) {
+          bucketLiquidity = liq
+        } else {
+          break
+        }
+      }
       
-      bars.push({
-        tick: tick.tick,
-        price,
-        liquidity: currentLiquidity > 0n ? currentLiquidity : 0n,
-        isCurrentTick: Math.abs(tick.tick - currentTick) < tickSpacing,
+      // Also check if any tick in this bucket has liquidity
+      for (const [tick, liq] of sortedTicks) {
+        if (tick >= tickStart && tick < tickEnd && liq > bucketLiquidity) {
+          bucketLiquidity = liq
+        }
+      }
+      
+      buckets.push({
+        tickStart,
+        tickEnd,
+        liquidity: bucketLiquidity,
+        containsCurrent,
+        position: tickEnd <= currentTick ? 'left' : tickStart >= currentTick ? 'right' : 'current',
       })
     }
     
-    return bars
-  }, [tickData, currentTick, tickSpacing, decimals0, decimals1])
+    return buckets
+  }, [minTick, maxTick, currentTick, liquidityByTick])
 
-  // Find max liquidity for scaling
-  const maxLiquidity = useMemo(() => {
-    if (liquidityBars.length === 0) return 1n
-    return liquidityBars.reduce((max, bar) => bar.liquidity > max ? bar.liquidity : max, 0n)
-  }, [liquidityBars])
+  // Calculate where current price line should be
+  const currentPricePosition = useMemo(() => {
+    const totalRange = maxTick - minTick
+    if (totalRange <= 0) return 50
+    return ((currentTick - minTick) / totalRange) * 100
+  }, [currentTick, minTick, maxTick])
 
-  // Filter bars to show only around current price
-  const visibleBars = useMemo(() => {
-    if (liquidityBars.length === 0) return []
+  // Summary stats
+  const { inRangeLiquidity, outOfRangeLiquidity } = useMemo(() => {
+    let inRange = 0n
+    let outRange = 0n
     
-    // Show bars within ~20% of current tick range
-    const tickRange = tickSpacing * 100
-    const minTick = currentTick - tickRange
-    const maxTick = currentTick + tickRange
+    for (const bucket of chartBuckets) {
+      if (bucket.containsCurrent) {
+        inRange = bucket.liquidity
+      } else if (bucket.liquidity > 0n) {
+        outRange += bucket.liquidity
+      }
+    }
     
-    return liquidityBars.filter(bar => bar.tick >= minTick && bar.tick <= maxTick)
-  }, [liquidityBars, currentTick, tickSpacing])
+    return { inRangeLiquidity: inRange, outOfRangeLiquidity: outRange }
+  }, [chartBuckets])
 
   if (isLoading) {
     return (
@@ -160,7 +218,7 @@ export function LiquidityDepthChart({
     )
   }
 
-  if (error || visibleBars.length === 0) {
+  if (error || chartBuckets.length === 0) {
     return (
       <div className="liquidity-depth-chart">
         <div className="depth-chart-empty">
@@ -186,23 +244,32 @@ export function LiquidityDepthChart({
         
         {/* Chart area */}
         <div className="depth-chart-bars">
-          {visibleBars.map((bar, i) => {
+          {chartBuckets.map((bucket, i) => {
             const heightPercent = maxLiquidity > 0n 
-              ? Number((bar.liquidity * 100n) / maxLiquidity)
+              ? Number((bucket.liquidity * 100n) / maxLiquidity)
               : 0
+            
+            const barClass = bucket.containsCurrent 
+              ? 'current' 
+              : bucket.liquidity > 0n 
+                ? (bucket.position === 'left' ? 'out-left' : 'out-right')
+                : ''
             
             return (
               <div 
                 key={i}
-                className={`depth-bar ${bar.isCurrentTick ? 'current' : ''}`}
-                style={{ height: `${Math.max(2, heightPercent)}%` }}
-                title={`Price: ${bar.price.toFixed(4)}\nLiquidity: ${formatLiquidity(bar.liquidity)}`}
+                className={`depth-bar ${barClass}`}
+                style={{ height: `${Math.max(heightPercent > 0 ? 4 : 0, heightPercent)}%` }}
+                title={`Ticks: ${bucket.tickStart} - ${bucket.tickEnd}\nLiquidity: ${formatLiquidity(bucket.liquidity)}`}
               />
             )
           })}
           
           {/* Current price indicator */}
-          <div className="depth-current-price-line" />
+          <div 
+            className="depth-current-price-line" 
+            style={{ left: `${currentPricePosition}%` }}
+          />
         </div>
       </div>
       
@@ -211,6 +278,18 @@ export function LiquidityDepthChart({
         <span>← Lower prices</span>
         <span className="current-label">Current</span>
         <span>Higher prices →</span>
+      </div>
+      
+      {/* Liquidity summary */}
+      <div className="depth-chart-summary">
+        <div className="summary-item">
+          <span className="summary-dot in-range" />
+          <span>In range: {formatLiquidity(inRangeLiquidity)}</span>
+        </div>
+        <div className="summary-item">
+          <span className="summary-dot out-range" />
+          <span>Out of range: {formatLiquidity(outOfRangeLiquidity)}</span>
+        </div>
       </div>
     </div>
   )
@@ -231,6 +310,10 @@ function formatLiquidity(value: bigint): string {
   for (const u of units) {
     if (value >= u.v) {
       const whole = value / u.v
+      const remainder = (value % u.v) * 10n / u.v
+      if (remainder > 0n) {
+        return `${whole.toString()}.${remainder.toString()}${u.s}`
+      }
       return `${whole.toString()}${u.s}`
     }
   }

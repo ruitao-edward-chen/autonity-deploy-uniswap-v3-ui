@@ -1115,32 +1115,47 @@ body {
 .depth-bar {
   flex: 1;
   min-width: 2px;
-  max-width: 8px;
-  background: linear-gradient(to top, #3b82f6, #60a5fa);
+  max-width: 10px;
+  background: var(--color-bg-tertiary);
   border-radius: 2px 2px 0 0;
   transition: all 0.2s ease;
-  opacity: 0.7;
 }
 
 .depth-bar:hover {
-  opacity: 1;
-  transform: scaleY(1.05);
+  opacity: 0.8;
 }
 
 .depth-bar.current {
   background: linear-gradient(to top, #10b981, #34d399);
-  opacity: 1;
+}
+
+.depth-bar.out-left {
+  background: linear-gradient(to top, #f59e0b, #fbbf24);
+}
+
+.depth-bar.out-right {
+  background: linear-gradient(to top, #f59e0b, #fbbf24);
 }
 
 .depth-current-price-line {
   position: absolute;
-  left: 50%;
-  top: 0;
-  bottom: 0;
+  top: -4px;
+  bottom: -4px;
   width: 2px;
   background: var(--color-primary);
-  opacity: 0.5;
   pointer-events: none;
+  z-index: 2;
+}
+
+.depth-current-price-line::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -3px;
+  width: 8px;
+  height: 8px;
+  background: var(--color-primary);
+  border-radius: 50%;
 }
 
 .depth-chart-xaxis {
@@ -1155,6 +1170,37 @@ body {
 .depth-chart-xaxis .current-label {
   color: var(--color-primary);
   font-weight: 600;
+}
+
+.depth-chart-summary {
+  display: flex;
+  justify-content: center;
+  gap: var(--spacing-lg);
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-border);
+}
+
+.summary-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+}
+
+.summary-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.summary-dot.in-range {
+  background: #10b981;
+}
+
+.summary-dot.out-range {
+  background: #f59e0b;
 }
 
 /* ============================================
