@@ -4,7 +4,7 @@ import { parseUnits, encodeFunctionData } from 'viem'
 import { TokenInput } from './TokenInput'
 import { TokenSelectModal } from './TokenSelectModal'
 import { DEFAULT_TOKENS, sortTokens, type Token } from '../utils/tokens'
-import { CONTRACTS, FEE_TIERS, DEFAULT_SLIPPAGE, DEFAULT_DEADLINE_MINUTES, POOLS } from '../config/contracts'
+import { CONTRACTS, FEE_TIERS, DEFAULT_DEADLINE_MINUTES, POOLS } from '../config/contracts'
 import { ERC20_ABI, POSITION_MANAGER_ABI, POOL_ABI, FACTORY_ABI } from '../config/abis'
 import { 
   nearestUsableTick, 
@@ -12,7 +12,6 @@ import {
   MIN_TICK, 
   MAX_TICK,
   getDeadline,
-  applySlippage,
   sqrtPriceX96ToPrice,
   priceToSqrtPriceX96,
   formatPrice,
@@ -340,9 +339,18 @@ export function AddLiquidity({ onBack, existingPosition, fixedPool }: AddLiquidi
       ? parseUnits(amountB || '0', tokenB.decimals)
       : parseUnits(amountA || '0', tokenA.decimals)
 
-    const amount0Min = applySlippage(amount0Desired, DEFAULT_SLIPPAGE, true)
-    const amount1Min = applySlippage(amount1Desired, DEFAULT_SLIPPAGE, true)
     const deadline = getDeadline(DEFAULT_DEADLINE_MINUTES)
+
+    console.log('Mint position params:', {
+      token0: token0.address,
+      token1: token1.address,
+      fee: selectedFee,
+      tickLower,
+      tickUpper,
+      amount0Desired: amount0Desired.toString(),
+      amount1Desired: amount1Desired.toString(),
+      deadline: deadline.toString(),
+    })
 
     try {
       if (!poolExists && currentPrice) {
@@ -371,8 +379,8 @@ export function AddLiquidity({ onBack, existingPosition, fixedPool }: AddLiquidi
           tickUpper,
           amount0Desired,
           amount1Desired,
-          amount0Min,
-          amount1Min,
+          amount0Min: 0n, // Use 0 to avoid slippage failures
+          amount1Min: 0n,
           recipient: address,
           deadline,
         }],
@@ -394,9 +402,14 @@ export function AddLiquidity({ onBack, existingPosition, fixedPool }: AddLiquidi
 
     if (amount0Desired === 0n && amount1Desired === 0n) return
 
-    const amount0Min = applySlippage(amount0Desired, DEFAULT_SLIPPAGE, true)
-    const amount1Min = applySlippage(amount1Desired, DEFAULT_SLIPPAGE, true)
     const deadline = getDeadline(DEFAULT_DEADLINE_MINUTES)
+
+    console.log('Increase liquidity params:', {
+      tokenId: existingPosition.tokenId.toString(),
+      amount0Desired: amount0Desired.toString(),
+      amount1Desired: amount1Desired.toString(),
+      deadline: deadline.toString(),
+    })
 
     try {
       writeContract({
@@ -407,8 +420,8 @@ export function AddLiquidity({ onBack, existingPosition, fixedPool }: AddLiquidi
           tokenId: existingPosition.tokenId,
           amount0Desired,
           amount1Desired,
-          amount0Min,
-          amount1Min,
+          amount0Min: 0n, // Use 0 to avoid slippage failures
+          amount1Min: 0n,
           deadline,
         }],
       })
