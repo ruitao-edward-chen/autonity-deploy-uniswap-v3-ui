@@ -680,12 +680,63 @@ export function AddLiquidity({ onBack, existingPosition, fixedPool }: AddLiquidi
             </div>
           )}
 
+          {/* Visual Price Range Bar */}
+          {currentPrice && tickLower < tickUpper && !isFullRange && (
+            <div className="liquidity-price-visual">
+              <div className="price-scale">
+                <div className="price-scale-track" />
+                
+                {/* Your liquidity range */}
+                <div 
+                  className={`price-scale-range ${positionType === 'in-range' ? 'in-range' : 'out-of-range'}`}
+                  style={{
+                    left: `${Math.max(0, Math.min(100, ((tickLower - (currentTick - 50000)) / 100000) * 100))}%`,
+                    width: `${Math.max(2, Math.min(100, ((tickUpper - tickLower) / 100000) * 100))}%`,
+                  }}
+                />
+                
+                {/* Current price marker */}
+                <div className="price-scale-current" style={{ left: '50%' }}>
+                  <div className="current-marker-line" />
+                  <div className="current-marker-label">Current</div>
+                </div>
+                
+                {/* Min price marker */}
+                <div 
+                  className="price-scale-bound min"
+                  style={{
+                    left: `${Math.max(0, Math.min(100, ((tickLower - (currentTick - 50000)) / 100000) * 100))}%`,
+                  }}
+                >
+                  <div className="bound-line" />
+                  <div className="bound-label">Min</div>
+                </div>
+                
+                {/* Max price marker */}
+                <div 
+                  className="price-scale-bound max"
+                  style={{
+                    left: `${Math.max(0, Math.min(100, ((tickUpper - (currentTick - 50000)) / 100000) * 100))}%`,
+                  }}
+                >
+                  <div className="bound-line" />
+                  <div className="bound-label">Max</div>
+                </div>
+              </div>
+              
+              <div className="price-scale-labels">
+                <span>Lower prices ←</span>
+                <span>→ Higher prices</span>
+              </div>
+            </div>
+          )}
+
           {/* Position type indicator */}
           <div className={`position-type-indicator ${positionType}`}>
-            {positionType === 'in-range' && 'Price is in range'}
-            {positionType === 'above-range' && '↑ Price above range - Only ' + token0.symbol + ' required (one-sided)'}
-            {positionType === 'below-range' && '↓ Price below range - Only ' + token1.symbol + ' required (one-sided)'}
-            {positionType === 'full-range' && '∞ Full range position'}
+            {positionType === 'in-range' && '● Price is in your range — You will earn fees'}
+            {positionType === 'above-range' && '↑ Price above range — Only ' + token0.symbol + ' required (one-sided)'}
+            {positionType === 'below-range' && '↓ Price below range — Only ' + token1.symbol + ' required (one-sided)'}
+            {positionType === 'full-range' && '∞ Full range position — Earns fees at any price'}
             {positionType === 'invalid' && '⚠ Invalid price range'}
           </div>
         </div>

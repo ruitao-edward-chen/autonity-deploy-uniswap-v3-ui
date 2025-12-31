@@ -1551,6 +1551,126 @@ body {
   color: #d97706;
 }
 
+/* Current price value display */
+.current-price-value {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  margin-top: calc(-1 * var(--spacing-xs));
+  margin-bottom: var(--spacing-sm);
+}
+
+.current-price-value strong {
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+}
+
+/* ============================================
+   AddLiquidity Price Visualization
+   ============================================ */
+.liquidity-price-visual {
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-md);
+}
+
+.price-scale {
+  position: relative;
+  height: 40px;
+  margin-bottom: var(--spacing-sm);
+}
+
+.price-scale-track {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-full);
+  transform: translateY(-50%);
+}
+
+.price-scale-range {
+  position: absolute;
+  top: 50%;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  transform: translateY(-50%);
+  opacity: 0.8;
+}
+
+.price-scale-range.in-range {
+  background: linear-gradient(90deg, rgba(16, 185, 129, 0.3), rgba(16, 185, 129, 0.5), rgba(16, 185, 129, 0.3));
+  border: 2px solid #10b981;
+}
+
+.price-scale-range.out-of-range {
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.3), rgba(245, 158, 11, 0.5), rgba(245, 158, 11, 0.3));
+  border: 2px solid #f59e0b;
+}
+
+.price-scale-current {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 3;
+}
+
+.current-marker-line {
+  width: 2px;
+  height: 100%;
+  background: var(--color-primary);
+}
+
+.current-marker-label {
+  position: absolute;
+  bottom: -18px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+
+.price-scale-bound {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 2;
+}
+
+.bound-line {
+  width: 2px;
+  height: 100%;
+  background: var(--color-text-secondary);
+}
+
+.bound-label {
+  position: absolute;
+  top: -16px;
+  font-size: 0.6rem;
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+}
+
+.price-scale-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.65rem;
+  color: var(--color-text-tertiary);
+  margin-top: var(--spacing-sm);
+}
+
 /* ============================================
    Footer
    ============================================ */

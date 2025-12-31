@@ -106,7 +106,8 @@ export function getDisplayPriceBounds(
   decimals0: number,
   decimals1: number
 ): { priceLower: string; priceUpper: string; isFullRange: boolean } {
-  const isFullRange = tickLower <= MIN_TICK + 100 || tickUpper >= MAX_TICK - 100
+  // More generous full-range detection - catches positions with extreme ticks
+  const isFullRange = tickLower <= MIN_TICK + 1000 || tickUpper >= MAX_TICK - 1000
   
   if (isFullRange) {
     return {
@@ -119,9 +120,26 @@ export function getDisplayPriceBounds(
   const priceLower = tickToPrice(tickLower, decimals0, decimals1)
   const priceUpper = tickToPrice(tickUpper, decimals0, decimals1)
   
+  // Handle extreme price values (likely wrong decimal handling or inverted)
+  const formatBoundPrice = (price: number | null, isLower: boolean): string => {
+    if (price === null) return isLower ? '~0' : '~∞'
+    
+    // If price is astronomically high, it's likely inverted - show the inverse
+    if (price > 1e12) {
+      const inverted = 1 / price
+      return formatPrice(inverted) + ' (inv)'
+    }
+    // If price is astronomically low
+    if (price < 1e-12 && price > 0) {
+      return isLower ? '~0' : formatPrice(price)
+    }
+    
+    return formatPrice(price)
+  }
+  
   return {
-    priceLower: priceLower !== null ? formatPrice(priceLower) : '~0',
-    priceUpper: priceUpper !== null ? formatPrice(priceUpper) : '~∞',
+    priceLower: formatBoundPrice(priceLower, true),
+    priceUpper: formatBoundPrice(priceUpper, false),
     isFullRange: false,
   }
 }

@@ -393,6 +393,22 @@ function PositionCard({ position, currentTick, onManage }: PositionCardProps) {
     position.token1.decimals
   )
 
+  // Calculate current price from tick for display
+  const currentPriceFromTick = useMemo(() => {
+    if (currentTick === null) return null
+    // Use sqrtPriceX96ToPrice logic but from tick
+    // price = 1.0001^tick * 10^(decimals0 - decimals1)
+    try {
+      const rawPrice = Math.pow(1.0001, currentTick)
+      const price = rawPrice * Math.pow(10, position.token0.decimals - position.token1.decimals)
+      // Handle inverted prices
+      if (price > 1e12) return formatPrice(1 / price)
+      return formatPrice(price)
+    } catch {
+      return null
+    }
+  }, [currentTick, position.token0.decimals, position.token1.decimals])
+
   const feeTier = FEE_TIERS.find(f => f.fee === position.fee)
 
   const hasLiquidity = position.liquidity > 0n
@@ -415,13 +431,20 @@ function PositionCard({ position, currentTick, onManage }: PositionCardProps) {
 
       {/* Visual Price Range Bar */}
       {!isFullRange && hasLiquidity && (
-        <PriceRangeBar
-          tickLower={position.tickLower}
-          tickUpper={position.tickUpper}
-          currentTick={currentTick}
-          token0Symbol={position.token0.symbol}
-          token1Symbol={position.token1.symbol}
-        />
+        <>
+          <PriceRangeBar
+            tickLower={position.tickLower}
+            tickUpper={position.tickUpper}
+            currentTick={currentTick}
+            token0Symbol={position.token0.symbol}
+            token1Symbol={position.token1.symbol}
+          />
+          {currentPriceFromTick && (
+            <div className="current-price-value">
+              Current: <strong>{currentPriceFromTick}</strong> {position.token1.symbol}/{position.token0.symbol}
+            </div>
+          )}
+        </>
       )}
 
       {isFullRange && (
@@ -609,16 +632,26 @@ function trimDecimals(value: string, maxDecimals: number): string {
 }
 
 function formatCompactBigint(value: bigint): string {
+  if (value === 0n) return '0'
+  
   const abs = value < 0n ? -value : value
   const sign = value < 0n ? '-' : ''
 
-  const units: Array<{ v: bigint; s: string }> = [
-    { v: 1_000_000_000_000_000_000n, s: 'E' },
-    { v: 1_000_000_000_000_000n, s: 'P' },
-    { v: 1_000_000_000_000n, s: 'T' },
-    { v: 1_000_000_000n, s: 'B' },
-    { v: 1_000_000n, s: 'M' },
-    { v: 1_000n, s: 'K' },
+  // For very large numbers, use scientific notation
+  if (abs >= 1_000_000_000_000_000_000_000n) { // > 10^21
+    const str = abs.toString()
+    const exp = str.length - 1
+    const mantissa = str[0] + '.' + str.slice(1, 3)
+    return `${sign}${mantissa}e${exp}`
+  }
+
+  const units: Array<{ v: bigint; s: string; name: string }> = [
+    { v: 1_000_000_000_000_000_000n, s: 'Q', name: 'quintillion' },
+    { v: 1_000_000_000_000_000n, s: 'q', name: 'quadrillion' },
+    { v: 1_000_000_000_000n, s: 'T', name: 'trillion' },
+    { v: 1_000_000_000n, s: 'B', name: 'billion' },
+    { v: 1_000_000n, s: 'M', name: 'million' },
+    { v: 1_000n, s: 'K', name: 'thousand' },
   ]
 
   for (const u of units) {
