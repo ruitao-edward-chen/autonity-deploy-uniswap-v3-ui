@@ -1,0 +1,281 @@
+/* ============================================
+   Font Import
+   ============================================ */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=Noto+Serif+JP:wght@300;400&display=swap');
+
+/* ============================================
+   Mori Finance - Clean Home Page
+   ============================================ */
+
+.home-page-jp {
+  min-height: 100vh;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  background: #f8fafc;
+  transition: background 0.3s ease;
+}
+
+.home-page-jp[data-theme="dark"] {
+  background: #0f0f14;
+}
+
+.ink-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+/* ============================================
+   Theme Toggle
+   ============================================ */
+.home-theme-toggle {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  z-index: 100;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  transition: all 0.2s ease;
+}
+
+.home-theme-toggle:hover {
+  background: rgba(255, 255, 255, 1);
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.home-page-jp[data-theme="dark"] .home-theme-toggle {
+  background: rgba(30, 30, 40, 0.8);
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+.home-page-jp[data-theme="dark"] .home-theme-toggle:hover {
+  background: rgba(40, 40, 55, 1);
+  border-color: #475569;
+  color: #e2e8f0;
+}
+
+/* ============================================
+   Content
+   ============================================ */
+.home-content-jp {
+  position: relative;
+  z-index: 10;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 60px 24px 24px;
+}
+
+.home-hero-jp {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+/* ============================================
+   Logo
+   ============================================ */
+.logo-container-jp {
+  margin-bottom: 16px;
+  animation: fadeIn 1s ease-out;
+}
+
+.logo-jp {
+  font-family: 'Noto Serif JP', serif;
+  font-size: 3rem;
+  font-weight: 300;
+  color: #0f172a;
+  letter-spacing: 0.02em;
+}
+
+.home-page-jp[data-theme="dark"] .logo-jp {
+  color: #e2e8f0;
+}
+
+/* ============================================
+   Typography
+   ============================================ */
+.home-title-jp {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 2.2rem;
+  font-weight: 500;
+  color: #0f172a;
+  margin: 0 0 12px 0;
+  letter-spacing: 0.35em;
+  text-transform: lowercase;
+  animation: fadeIn 1s ease-out 0.1s both;
+}
+
+.home-page-jp[data-theme="dark"] .home-title-jp {
+  color: #f1f5f9;
+}
+
+.home-meaning-jp {
+  font-family: 'Noto Serif JP', 'DM Sans', sans-serif;
+  font-size: 1rem;
+  color: #64748b;
+  margin: 0 0 40px 0;
+  letter-spacing: 0.15em;
+  animation: fadeIn 1s ease-out 0.2s both;
+}
+
+.home-page-jp[data-theme="dark"] .home-meaning-jp {
+  color: #94a3b8;
+}
+
+/* ============================================
+   Description
+   ============================================ */
+.home-description-jp {
+  margin-bottom: 48px;
+  animation: fadeIn 1s ease-out 0.3s both;
+}
+
+.home-description-jp p {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 400;
+  color: #475569;
+  line-height: 1.8;
+  margin: 0;
+}
+
+.home-page-jp[data-theme="dark"] .home-description-jp p {
+  color: #94a3b8;
+}
+
+/* ============================================
+   Enter Link
+   ============================================ */
+.enter-link-jp {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #64748b;
+  text-decoration: none;
+  letter-spacing: 0.1em;
+  padding: 8px 16px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  animation: fadeIn 1s ease-out 0.4s both;
+}
+
+.enter-link-jp:hover {
+  color: #0f172a;
+  background: rgba(15, 23, 42, 0.05);
+}
+
+.home-page-jp[data-theme="dark"] .enter-link-jp {
+  color: #94a3b8;
+}
+
+.home-page-jp[data-theme="dark"] .enter-link-jp:hover {
+  color: #f1f5f9;
+  background: rgba(241, 245, 249, 0.05);
+}
+
+/* ============================================
+   Footer
+   ============================================ */
+.home-footer-jp {
+  text-align: center;
+  padding: 20px;
+  animation: fadeIn 1s ease-out 0.5s both;
+}
+
+.home-footer-jp span {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.8rem;
+  color: #94a3b8;
+  letter-spacing: 0.05em;
+}
+
+.home-page-jp[data-theme="dark"] .home-footer-jp span {
+  color: #64748b;
+}
+
+/* ============================================
+   Animation
+   ============================================ */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================================
+   Responsive
+   ============================================ */
+@media (max-width: 640px) {
+  .home-content-jp {
+    padding: 40px 20px 20px;
+  }
+  
+  .home-theme-toggle {
+    top: 16px;
+    right: 16px;
+  }
+  
+  .logo-jp {
+    font-size: 2.4rem;
+  }
+  
+  .home-title-jp {
+    font-size: 1.8rem;
+    letter-spacing: 0.3em;
+  }
+  
+  .home-meaning-jp {
+    font-size: 0.9rem;
+    margin-bottom: 32px;
+  }
+  
+  .home-description-jp {
+    margin-bottom: 40px;
+  }
+  
+  .home-description-jp p {
+    font-size: 1rem;
+  }
+}
+
+/* ============================================
+   Reduced motion
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+  .logo-container-jp,
+  .home-title-jp,
+  .home-meaning-jp,
+  .home-description-jp,
+  .enter-link-jp,
+  .home-footer-jp {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}

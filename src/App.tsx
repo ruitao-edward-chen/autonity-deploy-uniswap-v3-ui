@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { WagmiProvider } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { wagmiConfig } from './config/wagmi'
 import { Header } from './components/Header'
 import { Swap } from './components/Swap'
 import { Liquidity } from './components/Pool'
+import { HomePage } from './components/HomePage'
 import './App.css'
+import './components/HomePage.css'
 
 const queryClient = new QueryClient()
 
@@ -63,7 +66,7 @@ function Bridge() {
 
 type Tab = 'swap' | 'liquidity' | 'bridge'
 
-function AppContent() {
+function AutonityApp() {
   const [activeTab, setActiveTab] = useState<Tab>('swap')
 
   // Handle hash navigation
@@ -148,7 +151,13 @@ export default function App() {
   return (
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
-        <AppContent />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/autonity" element={<AutonityApp />} />
+            <Route path="/autonity/*" element={<AutonityApp />} />
+          </Routes>
+        </BrowserRouter>
       </QueryClientProvider>
     </WagmiProvider>
   )

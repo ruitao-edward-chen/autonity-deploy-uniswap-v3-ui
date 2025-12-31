@@ -154,13 +154,27 @@ body {
   align-items: center;
   gap: var(--spacing-sm);
   color: var(--color-primary);
-  cursor: default;
+  cursor: pointer;
   user-select: none;
+  text-decoration: none;
+  transition: opacity 0.2s ease;
+}
+
+.logo:hover {
+  opacity: 0.7;
+}
+
+.logo-kanji {
+  font-family: 'Noto Serif JP', serif;
+  font-size: 1.5rem;
+  font-weight: 300;
+  color: var(--color-text-primary);
+  line-height: 1;
 }
 
 .logo-text {
-  font-weight: 700;
-  font-size: 1.25rem;
+  font-weight: 600;
+  font-size: 1.1rem;
   color: var(--color-text-primary);
 }
 
