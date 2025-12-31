@@ -256,6 +256,29 @@ export const POOL_ABI = [
   },
 ] as const
 
+export const TICK_LENS_ABI = [
+  {
+    inputs: [
+      { name: 'pool', type: 'address' },
+      { name: 'tickBitmapIndex', type: 'int16' },
+    ],
+    name: 'getPopulatedTicksInWord',
+    outputs: [
+      {
+        components: [
+          { name: 'tick', type: 'int24' },
+          { name: 'liquidityNet', type: 'int128' },
+          { name: 'liquidityGross', type: 'uint128' },
+        ],
+        name: 'populatedTicks',
+        type: 'tuple[]',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+] as const
+
 export const FACTORY_ABI = [
   {
     inputs: [

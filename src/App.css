@@ -959,6 +959,118 @@ body {
 }
 
 /* ============================================
+   Liquidity Depth Chart
+   ============================================ */
+.liquidity-depth-chart {
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.depth-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.depth-chart-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.depth-chart-subtitle {
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+}
+
+.depth-chart-loading,
+.depth-chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  height: 120px;
+  color: var(--color-text-tertiary);
+  font-size: 0.875rem;
+}
+
+.depth-chart-container {
+  display: flex;
+  height: 120px;
+  gap: var(--spacing-xs);
+}
+
+.depth-chart-yaxis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-size: 0.625rem;
+  color: var(--color-text-tertiary);
+  width: 30px;
+  text-align: right;
+  padding-right: var(--spacing-xs);
+}
+
+.depth-chart-bars {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  position: relative;
+  background: linear-gradient(to top, var(--color-bg-tertiary) 0%, transparent 100%);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+}
+
+.depth-bar {
+  flex: 1;
+  min-width: 2px;
+  max-width: 8px;
+  background: linear-gradient(to top, #3b82f6, #60a5fa);
+  border-radius: 2px 2px 0 0;
+  transition: all 0.2s ease;
+  opacity: 0.7;
+}
+
+.depth-bar:hover {
+  opacity: 1;
+  transform: scaleY(1.05);
+}
+
+.depth-bar.current {
+  background: linear-gradient(to top, #10b981, #34d399);
+  opacity: 1;
+}
+
+.depth-current-price-line {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-primary);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.depth-chart-xaxis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.625rem;
+  color: var(--color-text-tertiary);
+  margin-top: var(--spacing-xs);
+  padding: 0 34px;
+}
+
+.depth-chart-xaxis .current-label {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+/* ============================================
    Add Liquidity
    ============================================ */
 .add-liquidity-container {

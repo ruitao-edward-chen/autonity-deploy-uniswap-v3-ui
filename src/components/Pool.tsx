@@ -5,6 +5,7 @@ import { ERC20_ABI, POSITION_MANAGER_ABI, POOL_ABI } from '../config/abis'
 import { getDisplayPriceBounds, formatAmount, sqrtPriceX96ToPrice, formatPrice } from '../utils/math'
 import { DEFAULT_TOKENS, getTokenByAddress, type Token } from '../utils/tokens'
 import { AddLiquidity } from './AddLiquidity'
+import { LiquidityDepthChart } from './LiquidityDepthChart'
 import { formatUnits } from 'viem'
 
 interface Position {
@@ -503,6 +504,12 @@ function PoolCard({ poolAddress, token0, token1, fee, onAddLiquidity }: PoolCard
     functionName: 'slot0',
   })
 
+  const { data: tickSpacingRaw } = useReadContract({
+    address: poolAddress as `0x${string}`,
+    abi: POOL_ABI,
+    functionName: 'tickSpacing',
+  })
+
   const { data: token0Balance } = useReadContract({
     address: token0.address as `0x${string}`,
     abi: ERC20_ABI,
@@ -516,6 +523,9 @@ function PoolCard({ poolAddress, token0, token1, fee, onAddLiquidity }: PoolCard
     functionName: 'balanceOf',
     args: [poolAddress as `0x${string}`],
   })
+
+  const currentTick = slot0 ? Number(slot0[1]) : 0
+  const tickSpacing = tickSpacingRaw ? Number(tickSpacingRaw) : 10
 
   const currentPrice = slot0 
     ? sqrtPriceX96ToPrice(slot0[0] as bigint, token0.decimals, token1.decimals)
@@ -618,6 +628,19 @@ function PoolCard({ poolAddress, token0, token1, fee, onAddLiquidity }: PoolCard
           {approxTvlToken1 !== null ? `≈ ${approxTvlToken1} ${token1.symbol}` : '—'}
         </span>
       </div>
+
+      {/* Liquidity Depth Chart */}
+      {slot0 && (
+        <LiquidityDepthChart
+          poolAddress={poolAddress}
+          currentTick={currentTick}
+          tickSpacing={tickSpacing}
+          decimals0={token0.decimals}
+          decimals1={token1.decimals}
+          token0Symbol={token0.symbol}
+          token1Symbol={token1.symbol}
+        />
+      )}
 
       <button className="pool-add-button" onClick={onAddLiquidity}>
         Add Liquidity
