@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { usePublicClient } from 'wagmi'
-import { CONTRACTS, POOLS } from '../config/contracts'
+import { CONTRACTS } from '../config/contracts'
 import { TICK_LENS_ABI } from '../config/abis'
 
 interface TickData {
