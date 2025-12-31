@@ -613,8 +613,8 @@ function PoolCard({ poolAddress, token0, token1, fee, onAddLiquidity }: PoolCard
       <div className="pool-item-header">
         <div className="pool-tokens">
           <div className="token-icons">
-            <div className="token-icon" style={{ backgroundColor: '#6366f1' }}>W</div>
-            <div className="token-icon" style={{ backgroundColor: '#2775ca', marginLeft: '-8px' }}>U</div>
+            <img className="token-icon" src={token0.logoURI} alt={token0.symbol} />
+            <img className="token-icon" src={token1.logoURI} alt={token1.symbol} style={{ marginLeft: '-8px' }} />
           </div>
           <span className="pool-pair">{token0.symbol} / {token1.symbol}</span>
           <span className="fee-badge">{feeTier?.label}</span>

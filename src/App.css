@@ -1258,13 +1258,17 @@ body {
   width: 28px;
   height: 28px;
   border-radius: 50%;
+  border: 2px solid var(--color-bg-secondary);
+  object-fit: cover;
+}
+
+.token-icon.fallback {
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
   font-size: 0.75rem;
   font-weight: 700;
-  border: 2px solid var(--color-bg-secondary);
 }
 
 .pool-pair {
