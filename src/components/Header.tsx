@@ -35,29 +35,44 @@ export function Header() {
           <span className="logo-text">Mori</span>
         </div>
 
-        <div className="wallet-section">
-          {isConnected ? (
-            <div className="wallet-connected">
-              {balance && (
-                <span className="balance">
-                  {formatTokenBalance(balance.value, balance.decimals)} {balance.symbol}
-                </span>
-              )}
-              <button className="wallet-button connected" onClick={() => disconnect()}>
-                <span className="address">
-                  {address?.slice(0, 6)}...{address?.slice(-4)}
-                </span>
+        <div className="header-actions">
+          {/* Chain Selector */}
+          <button className="chain-selector">
+            <svg className="chain-icon" width="20" height="20" viewBox="0 0 32 32" fill="none">
+              <circle cx="16" cy="16" r="14" fill="#1a1a2e" stroke="#4a4a6a" strokeWidth="2"/>
+              <path d="M16 6L22 16L16 26L10 16L16 6Z" fill="#00d4aa"/>
+            </svg>
+            <span className="chain-name">Autonity</span>
+            <svg className="chain-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+
+          {/* Wallet Section */}
+          <div className="wallet-section">
+            {isConnected ? (
+              <div className="wallet-connected">
+                {balance && (
+                  <span className="balance">
+                    {formatTokenBalance(balance.value, balance.decimals)} {balance.symbol}
+                  </span>
+                )}
+                <button className="wallet-button connected" onClick={() => disconnect()}>
+                  <span className="address">
+                    {address?.slice(0, 6)}...{address?.slice(-4)}
+                  </span>
+                </button>
+              </div>
+            ) : (
+              <button 
+                className="wallet-button"
+                onClick={() => setShowWalletModal(true)}
+                disabled={isPending}
+              >
+                {isPending ? 'Connecting...' : 'Connect Wallet'}
               </button>
-            </div>
-          ) : (
-            <button 
-              className="wallet-button"
-              onClick={() => setShowWalletModal(true)}
-              disabled={isPending}
-            >
-              {isPending ? 'Connecting...' : 'Connect Wallet'}
-            </button>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
