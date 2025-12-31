@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useAccount, useReadContract, usePublicClient } from 'wagmi'
-import { CONTRACTS, TOKENS, FEE_TIERS } from '../config/contracts'
+import { CONTRACTS, TOKENS, FEE_TIERS, POOLS } from '../config/contracts'
 import { POSITION_MANAGER_ABI, POOL_ABI } from '../config/abis'
 import { getDisplayPriceBounds, formatAmount, sqrtPriceX96ToPrice, formatPrice } from '../utils/math'
-import { getTokenByAddress, type Token } from '../utils/tokens'
+import { DEFAULT_TOKENS, getTokenByAddress, type Token } from '../utils/tokens'
 import { AddLiquidity } from './AddLiquidity'
 
 interface Position {
@@ -18,7 +18,7 @@ interface Position {
   tokensOwed1: bigint
 }
 
-export function Pool() {
+export function Liquidity() {
   const { address, isConnected } = useAccount()
   const [positions, setPositions] = useState<Position[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -26,6 +26,10 @@ export function Pool() {
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(null)
   const [error, setError] = useState<string | null>(null)
   const publicClient = usePublicClient()
+
+  const fixedPool = POOLS.WATN_USDC
+  const fixedTokenA = DEFAULT_TOKENS.find(t => t.symbol === 'WATN')!
+  const fixedTokenB = DEFAULT_TOKENS.find(t => t.symbol === 'USDC.pol')!
 
   // Get number of positions owned
   const { data: positionCount } = useReadContract({
@@ -49,10 +53,11 @@ export function Pool() {
       const count = Number(positionCount)
       const fetchedPositions: Position[] = []
 
-      // Fetch up to 10 positions for performance
-      const maxPositions = Math.min(count, 10)
+      const watnAddr = TOKENS.WATN.address.toLowerCase()
+      const usdcAddr = TOKENS.USDC.address.toLowerCase()
 
-      for (let i = 0; i < maxPositions; i++) {
+      // Fetch up to 10 positions *in the fixed pool* for performance
+      for (let i = 0; i < count && fetchedPositions.length < 10; i++) {
         try {
           // Get tokenId for this position index
           const tokenId = await publicClient.readContract({
@@ -84,6 +89,15 @@ export function Pool() {
             tokensOwed0,
             tokensOwed1,
           ] = positionData
+
+          const t0Addr = (token0Address as string).toLowerCase()
+          const t1Addr = (token1Address as string).toLowerCase()
+          const isTargetPair = (t0Addr === watnAddr && t1Addr === usdcAddr) || (t0Addr === usdcAddr && t1Addr === watnAddr)
+          const isTargetFee = Number(fee) === fixedPool.fee
+
+          if (!isTargetPair || !isTargetFee) {
+            continue
+          }
 
           // Get token info - use known tokens or create placeholder
           const token0 = getTokenByAddress(token0Address as `0x${string}`) || {
@@ -125,8 +139,12 @@ export function Pool() {
   if (showAddLiquidity) {
     return (
       <AddLiquidity 
-        onBack={() => setShowAddLiquidity(false)}
+        onBack={() => {
+          setShowAddLiquidity(false)
+          setSelectedPosition(null)
+        }}
         existingPosition={selectedPosition}
+        fixedPool={!selectedPosition ? { tokenA: fixedTokenA, tokenB: fixedTokenB, fee: fixedPool.fee, poolAddress: fixedPool.address } : undefined}
       />
     )
   }
@@ -165,12 +183,11 @@ export function Pool() {
               <line x1="9" y1="21" x2="9" y2="9" />
             </svg>
           </div>
-          <p>No positions found</p>
+          <p>No liquidity positions found</p>
           <span className="empty-hint">
-            {positionCount && positionCount > 0n 
-              ? `You have ${positionCount.toString()} position(s). Loading...`
-              : 'Create a new position to start earning fees'
-            }
+            {positionCount && positionCount > 0n
+              ? `You have ${positionCount.toString()} position(s) overall, but none in the WATN/USDC pool.`
+              : 'Create a new position in the WATN/USDC pool to start earning fees'}
           </span>
         </div>
       )
@@ -196,7 +213,7 @@ export function Pool() {
     <div className="pool-container">
       <div className="pool-card">
         <div className="pool-header">
-          <h2>Your Positions</h2>
+          <h2>Liquidity (WATN / USDC)</h2>
           <button 
             className="add-liquidity-button"
             onClick={() => {
@@ -204,23 +221,26 @@ export function Pool() {
               setShowAddLiquidity(true)
             }}
           >
-            + New
+            + Add
           </button>
         </div>
 
-        {renderPositions()}
+        <div className="pool-list" style={{ marginBottom: 'var(--spacing-lg)' }}>
+          <PoolCard 
+            poolAddress={fixedPool.address}
+            token0={TOKENS.WATN}
+            token1={TOKENS.USDC}
+            fee={fixedPool.fee}
+            onAddLiquidity={() => {
+              setSelectedPosition(null)
+              setShowAddLiquidity(true)
+            }}
+          />
+        </div>
 
-        <div className="pool-info">
-          <h3>Available Pools</h3>
-          <div className="pool-list">
-            <PoolCard 
-              poolAddress="0x8703324e56B0724158bdd0B25251fFb5D3343Aba"
-              token0={TOKENS.WATN}
-              token1={TOKENS.USDC}
-              fee={500}
-              onAddLiquidity={() => setShowAddLiquidity(true)}
-            />
-          </div>
+        <div className="pool-info" style={{ marginTop: 0, paddingTop: 0, borderTop: 'none' }}>
+          <h3>Your Positions</h3>
+          {renderPositions()}
         </div>
       </div>
     </div>

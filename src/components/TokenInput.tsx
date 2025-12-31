@@ -10,6 +10,7 @@ interface TokenInputProps {
   balance?: bigint
   label: string
   disabled?: boolean
+  disableTokenSelect?: boolean
   showMax?: boolean
 }
 
@@ -21,6 +22,7 @@ export function TokenInput({
   balance,
   label,
   disabled = false,
+  disableTokenSelect = false,
   showMax = false,
 }: TokenInputProps) {
   const [focused, setFocused] = useState(false)
@@ -70,7 +72,7 @@ export function TokenInput({
           disabled={disabled}
           className="amount-input"
         />
-        <button className="token-select-button" onClick={onTokenSelect}>
+        <button className="token-select-button" onClick={onTokenSelect} disabled={disableTokenSelect}>
           {token ? (
             <>
               <TokenLogo token={token} />

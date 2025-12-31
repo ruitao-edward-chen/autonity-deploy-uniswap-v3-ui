@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
-import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useBalance } from 'wagmi'
-import { parseUnits, formatUnits } from 'viem'
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useBalance } from 'wagmi'
+import { parseUnits, formatUnits, encodeFunctionData } from 'viem'
 import { TokenInput } from './TokenInput'
 import { TokenSelectModal } from './TokenSelectModal'
 import { DEFAULT_TOKENS, sortTokens, type Token } from '../utils/tokens'
@@ -17,7 +17,8 @@ import {
   sqrtPriceX96ToPrice,
   priceToSqrtPriceX96,
   formatPrice,
-  isTickSafe
+  isTickSafe,
+  getDisplayPriceBounds
 } from '../utils/math'
 
 interface AddLiquidityProps {
@@ -29,28 +30,45 @@ interface AddLiquidityProps {
     fee: number
     tickLower: number
     tickUpper: number
+    liquidity?: bigint
   } | null
+  fixedPool?: {
+    tokenA: Token
+    tokenB: Token
+    fee: number
+    poolAddress: `0x${string}`
+  }
 }
 
-export function AddLiquidity({ onBack, existingPosition }: AddLiquidityProps) {
+type ManageTab = 'increase' | 'remove'
+
+const MAX_UINT128 = (2n ** 128n) - 1n
+
+export function AddLiquidity({ onBack, existingPosition, fixedPool }: AddLiquidityProps) {
   const { address } = useAccount()
+  const isManaging = !!existingPosition
+  const isFixedPool = !isManaging && !!fixedPool
   
   // Token selection
-  const [tokenA, setTokenA] = useState<Token>(DEFAULT_TOKENS[0]) // WATN
-  const [tokenB, setTokenB] = useState<Token>(DEFAULT_TOKENS[1]) // USDC
+  const [tokenA, setTokenA] = useState<Token>(fixedPool?.tokenA ?? DEFAULT_TOKENS[0]) // WATN
+  const [tokenB, setTokenB] = useState<Token>(fixedPool?.tokenB ?? DEFAULT_TOKENS[1]) // USDC
   const [selectingToken, setSelectingToken] = useState<'A' | 'B' | null>(null)
   
   // Amounts
   const [amountA, setAmountA] = useState('')
   const [amountB, setAmountB] = useState('')
   
-  // Fee tier - default to 0.05% (500) since that's the existing WATN/USDC pool
-  const [selectedFee, setSelectedFee] = useState(500)
+  // Fee tier
+  const [selectedFee, setSelectedFee] = useState(fixedPool?.fee ?? 3000)
   
   // Price range
   const [minPrice, setMinPrice] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
   const [isFullRange, setIsFullRange] = useState(false)
+
+  // Manage mode state
+  const [manageTab, setManageTab] = useState<ManageTab>('increase')
+  const [removePercent, setRemovePercent] = useState(50)
   
   // UI state
   const [showPriceInputs, setShowPriceInputs] = useState(true)
@@ -59,55 +77,95 @@ export function AddLiquidity({ onBack, existingPosition }: AddLiquidityProps) {
   const [token0, token1] = useMemo(() => sortTokens(tokenA, tokenB), [tokenA, tokenB])
   const isToken0First = token0.address === tokenA.address
 
-  // Check which fee tiers have existing pools for the selected token pair
-  const poolQueries = useMemo(() => 
-    FEE_TIERS.map(tier => ({
-      address: CONTRACTS.v3Factory as `0x${string}`,
-      abi: FACTORY_ABI,
-      functionName: 'getPool' as const,
-      args: [token0.address, token1.address, tier.fee] as const,
-    })),
-    [token0.address, token1.address]
-  )
+  useEffect(() => {
+    if (!existingPosition) return
 
-  const { data: poolResults } = useReadContracts({
-    contracts: poolQueries,
+    setTokenA(existingPosition.token0)
+    setTokenB(existingPosition.token1)
+    setSelectedFee(existingPosition.fee)
+    setManageTab('increase')
+    setRemovePercent(50)
+    setAmountA('')
+    setAmountB('')
+
+    // Keep display-only range info in sync for the UI
+    const bounds = getDisplayPriceBounds(
+      existingPosition.tickLower,
+      existingPosition.tickUpper,
+      existingPosition.token0.decimals,
+      existingPosition.token1.decimals
+    )
+    setMinPrice(bounds.priceLower)
+    setMaxPrice(bounds.priceUpper)
+    setIsFullRange(bounds.isFullRange)
+  }, [existingPosition])
+
+  useEffect(() => {
+    if (!fixedPool || existingPosition) return
+
+    setTokenA(fixedPool.tokenA)
+    setTokenB(fixedPool.tokenB)
+    setSelectedFee(fixedPool.fee)
+    setSelectingToken(null)
+  }, [existingPosition, fixedPool])
+
+  const positionLiquidity = useMemo(() => {
+    if (!existingPosition) return 0n
+    return existingPosition.liquidity ?? 0n
+  }, [existingPosition])
+
+  const liquidityToRemove = useMemo(() => {
+    if (!isManaging) return 0n
+    if (positionLiquidity <= 0n) return 0n
+    if (!Number.isFinite(removePercent) || removePercent <= 0) return 0n
+
+    const pct = Math.max(0, Math.min(100, Math.floor(removePercent)))
+    return (positionLiquidity * BigInt(pct)) / 100n
+  }, [isManaging, positionLiquidity, removePercent])
+
+  // Get pool address from factory
+  const { data: poolAddressRaw } = useReadContract({
+    address: CONTRACTS.v3Factory,
+    abi: FACTORY_ABI,
+    functionName: 'getPool',
+    args: [token0.address, token1.address, selectedFee],
+    query: { enabled: !fixedPool },
   })
 
-  // Map fee tiers to their pool existence status
-  const feePoolMap = useMemo(() => {
-    const zeroAddress = '0x0000000000000000000000000000000000000000'
-    const map: Record<number, { exists: boolean; address?: string }> = {}
-    
-    // Check if selected tokens are WATN/USDC pair
+  // Check if this is the known WATN/USDC pool
+  const isKnownPool = useMemo(() => {
     const watnAddr = POOLS.WATN_USDC.token0.address.toLowerCase()
     const usdcAddr = POOLS.WATN_USDC.token1.address.toLowerCase()
     const t0 = token0.address.toLowerCase()
     const t1 = token1.address.toLowerCase()
-    const isWatnUsdcPair = (t0 === watnAddr && t1 === usdcAddr) || (t0 === usdcAddr && t1 === watnAddr)
-    
-    FEE_TIERS.forEach((tier, index) => {
-      const result = poolResults?.[index]?.result as `0x${string}` | undefined
-      const hasPoolFromFactory = result && result.toLowerCase() !== zeroAddress.toLowerCase()
-      
-      // For WATN/USDC pair at 0.05% fee, use known pool as fallback
-      const isKnownPool = isWatnUsdcPair && tier.fee === POOLS.WATN_USDC.fee
-      
-      map[tier.fee] = {
-        exists: hasPoolFromFactory || isKnownPool,
-        address: hasPoolFromFactory ? result : (isKnownPool ? POOLS.WATN_USDC.address : undefined)
-      }
-    })
-    
-    return map
-  }, [poolResults, token0.address, token1.address])
+    return selectedFee === POOLS.WATN_USDC.fee && 
+           ((t0 === watnAddr && t1 === usdcAddr) || (t0 === usdcAddr && t1 === watnAddr))
+  }, [token0.address, token1.address, selectedFee])
 
-  // Get current pool address based on selected fee
-  const poolAddress = feePoolMap[selectedFee]?.address
-  const poolExists = feePoolMap[selectedFee]?.exists || false
+  // Use known pool address as fallback if factory lookup fails
+  const poolAddress = useMemo(() => {
+    if (fixedPool) return fixedPool.poolAddress
+
+    const factoryResult = poolAddressRaw as `0x${string}` | undefined
+    const zeroAddress = '0x0000000000000000000000000000000000000000'
+    
+    // If factory returned a valid address, use it
+    if (factoryResult && factoryResult.toLowerCase() !== zeroAddress.toLowerCase()) {
+      return factoryResult
+    }
+    
+    // Fallback to known pool address for WATN/USDC
+    if (isKnownPool) {
+      return POOLS.WATN_USDC.address
+    }
+    
+    return undefined
+  }, [fixedPool, poolAddressRaw, isKnownPool])
+
+  const poolExists = Boolean(poolAddress)
 
   // Debug logging
-  console.log('Pool lookup:', 'token0:', token0.address, 'token1:', token1.address, 'fee:', selectedFee, 'poolAddress:', poolAddress, 'poolExists:', poolExists, 'feePoolMap:', feePoolMap)
+  console.log('Pool lookup:', 'token0:', token0.address, 'token1:', token1.address, 'fee:', selectedFee, 'factoryResult:', poolAddressRaw, 'poolAddress:', poolAddress, 'isKnownPool:', isKnownPool, 'poolExists:', poolExists)
 
   // Get pool state if exists
   const { data: slot0 } = useReadContract({
@@ -178,6 +236,13 @@ export function AddLiquidity({ onBack, existingPosition }: AddLiquidityProps) {
 
   // Calculate ticks from prices
   const { tickLower, tickUpper } = useMemo(() => {
+    if (existingPosition) {
+      return {
+        tickLower: existingPosition.tickLower,
+        tickUpper: existingPosition.tickUpper,
+      }
+    }
+
     if (isFullRange) {
       return {
         tickLower: nearestUsableTick(MIN_TICK, tickSpacing),
@@ -200,7 +265,7 @@ export function AddLiquidity({ onBack, existingPosition }: AddLiquidityProps) {
       tickLower: nearestUsableTick(rawTickLower, tickSpacing),
       tickUpper: nearestUsableTick(rawTickUpper, tickSpacing),
     }
-  }, [minPrice, maxPrice, isFullRange, tickSpacing, token0.decimals, token1.decimals])
+  }, [existingPosition, isFullRange, maxPrice, minPrice, tickSpacing, token0.decimals, token1.decimals])
 
   // Determine position type based on price range
   const positionType = useMemo(() => {
@@ -213,6 +278,7 @@ export function AddLiquidity({ onBack, existingPosition }: AddLiquidityProps) {
 
   // Set initial prices from current pool price
   useEffect(() => {
+    if (existingPosition) return
     if (currentPrice && minPrice === '' && maxPrice === '') {
       // Set default range to ±50% of current price for better UX
       const lower = currentPrice * 0.5
@@ -265,7 +331,7 @@ export function AddLiquidity({ onBack, existingPosition }: AddLiquidityProps) {
     })
   }
 
-  const handleAddLiquidity = async () => {
+  const handleMintPosition = async () => {
     if (!address || tickLower >= tickUpper) return
 
     const amount0Desired = isToken0First 
@@ -317,8 +383,101 @@ export function AddLiquidity({ onBack, existingPosition }: AddLiquidityProps) {
     }
   }
 
+  const handleIncreaseLiquidity = async () => {
+    if (!address || !existingPosition || tickLower >= tickUpper) return
+
+    const amount0Desired = isToken0First 
+      ? parseUnits(amountA || '0', tokenA.decimals)
+      : parseUnits(amountB || '0', tokenB.decimals)
+    const amount1Desired = isToken0First
+      ? parseUnits(amountB || '0', tokenB.decimals)
+      : parseUnits(amountA || '0', tokenA.decimals)
+
+    if (amount0Desired === 0n && amount1Desired === 0n) return
+
+    const amount0Min = applySlippage(amount0Desired, DEFAULT_SLIPPAGE, true)
+    const amount1Min = applySlippage(amount1Desired, DEFAULT_SLIPPAGE, true)
+    const deadline = getDeadline(DEFAULT_DEADLINE_MINUTES)
+
+    try {
+      writeContract({
+        address: CONTRACTS.nonfungiblePositionManager,
+        abi: POSITION_MANAGER_ABI,
+        functionName: 'increaseLiquidity',
+        args: [{
+          tokenId: existingPosition.tokenId,
+          amount0Desired,
+          amount1Desired,
+          amount0Min,
+          amount1Min,
+          deadline,
+        }],
+      })
+    } catch (err) {
+      console.error('Increase liquidity error:', err)
+    }
+  }
+
+  const handleRemoveLiquidity = async () => {
+    if (!address || !existingPosition) return
+    if (positionLiquidity <= 0n) return
+    if (liquidityToRemove <= 0n) return
+
+    const deadline = getDeadline(DEFAULT_DEADLINE_MINUTES)
+
+    try {
+      const decreaseData = encodeFunctionData({
+        abi: POSITION_MANAGER_ABI,
+        functionName: 'decreaseLiquidity',
+        args: [{
+          tokenId: existingPosition.tokenId,
+          liquidity: liquidityToRemove,
+          amount0Min: 0n,
+          amount1Min: 0n,
+          deadline,
+        }],
+      })
+
+      const collectData = encodeFunctionData({
+        abi: POSITION_MANAGER_ABI,
+        functionName: 'collect',
+        args: [{
+          tokenId: existingPosition.tokenId,
+          recipient: address,
+          amount0Max: MAX_UINT128,
+          amount1Max: MAX_UINT128,
+        }],
+      })
+
+      writeContract({
+        address: CONTRACTS.nonfungiblePositionManager,
+        abi: POSITION_MANAGER_ABI,
+        functionName: 'multicall',
+        args: [[decreaseData, collectData]],
+      })
+    } catch (err) {
+      console.error('Remove liquidity error:', err)
+    }
+  }
+
   const getButtonText = () => {
     if (isWriting || isConfirming) return 'Confirming...'
+
+    if (isManaging) {
+      if (manageTab === 'remove') {
+        if (positionLiquidity <= 0n) return 'No Liquidity'
+        if (liquidityToRemove <= 0n) return 'Enter % to remove'
+        return 'Remove Liquidity'
+      }
+
+      if (needsApprovalA()) return `Approve ${tokenA.symbol}`
+      if (needsApprovalB()) return `Approve ${tokenB.symbol}`
+      if ((!amountA || parseFloat(amountA) === 0) && (!amountB || parseFloat(amountB) === 0)) {
+        return 'Enter Amounts'
+      }
+      return 'Increase Liquidity'
+    }
+
     if (!poolExists) return 'Create Pool & Add Liquidity'
     if (tickLower >= tickUpper) return 'Invalid Price Range'
     if (needsApprovalA()) return `Approve ${tokenA.symbol}`
@@ -330,12 +489,28 @@ export function AddLiquidity({ onBack, existingPosition }: AddLiquidityProps) {
   }
 
   const handleButtonClick = () => {
+    if (isManaging) {
+      if (manageTab === 'remove') {
+        handleRemoveLiquidity()
+        return
+      }
+
+      if (needsApprovalA()) {
+        handleApprove('A')
+      } else if (needsApprovalB()) {
+        handleApprove('B')
+      } else {
+        handleIncreaseLiquidity()
+      }
+      return
+    }
+
     if (needsApprovalA()) {
       handleApprove('A')
     } else if (needsApprovalB()) {
       handleApprove('B')
     } else {
-      handleAddLiquidity()
+      handleMintPosition()
     }
   }
 
@@ -370,42 +545,68 @@ export function AddLiquidity({ onBack, existingPosition }: AddLiquidityProps) {
               <polyline points="12 19 5 12 12 5" />
             </svg>
           </button>
-          <h2>Add Liquidity</h2>
+          <h2>{isManaging ? 'Manage Position' : (isFixedPool ? 'Add Liquidity (WATN / USDC)' : 'Add Liquidity')}</h2>
         </div>
+
+        {isManaging && (
+          <div style={{ display: 'flex', gap: 8, marginBottom: 'var(--spacing-lg)' }}>
+            <button
+              className={`fee-tier-option ${manageTab === 'increase' ? 'selected' : ''}`}
+              onClick={() => setManageTab('increase')}
+            >
+              <span className="fee-label">Increase</span>
+              <span className="fee-desc">Add to this position</span>
+            </button>
+            <button
+              className={`fee-tier-option ${manageTab === 'remove' ? 'selected' : ''}`}
+              onClick={() => setManageTab('remove')}
+            >
+              <span className="fee-label">Remove</span>
+              <span className="fee-desc">Withdraw liquidity</span>
+            </button>
+          </div>
+        )}
 
         {/* Fee Tier Selection */}
         <div className="fee-tier-section">
-          <label className="section-label">Select Fee Tier</label>
-          <div className="fee-tier-options">
-            {FEE_TIERS.map(tier => {
-              const hasPool = feePoolMap[tier.fee]?.exists || false
-              
-              return (
+          <label className="section-label">{(isManaging || isFixedPool) ? 'Fee Tier (fixed)' : 'Select Fee Tier'}</label>
+          {(isManaging || isFixedPool) ? (
+            <div className="current-price" style={{ marginBottom: 0 }}>
+              <strong>{FEE_TIERS.find(t => t.fee === selectedFee)?.label || `${selectedFee / 10000}%`}</strong>
+            </div>
+          ) : (
+            <div className="fee-tier-options">
+              {FEE_TIERS.map(tier => (
                 <button
                   key={tier.fee}
-                  className={`fee-tier-option ${selectedFee === tier.fee ? 'selected' : ''} ${hasPool ? 'has-pool' : 'no-pool'}`}
-                  onClick={() => hasPool && setSelectedFee(tier.fee)}
-                  disabled={!hasPool}
+                  className={`fee-tier-option ${selectedFee === tier.fee ? 'selected' : ''}`}
+                  onClick={() => setSelectedFee(tier.fee)}
                 >
                   <span className="fee-label">{tier.label}</span>
-                  {hasPool && <span className="pool-exists-badge">Pool exists</span>}
-                  {!hasPool && <span className="no-pool-badge">No pool</span>}
+                  <span className="fee-desc">
+                    {tier.fee === 100 && 'Very stable pairs'}
+                    {tier.fee === 500 && 'Stable pairs'}
+                    {tier.fee === 3000 && 'Most pairs'}
+                    {tier.fee === 10000 && 'Exotic pairs'}
+                  </span>
                 </button>
-              )
-            })}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Price Range */}
         <div className="price-range-section">
           <div className="section-header">
-            <label className="section-label">Set Price Range</label>
-            <button 
-              className={`full-range-toggle ${isFullRange ? 'active' : ''}`}
-              onClick={() => setIsFullRange(!isFullRange)}
-            >
-              Full Range
-            </button>
+            <label className="section-label">{isManaging ? 'Price Range (fixed)' : 'Set Price Range'}</label>
+            {!isManaging && (
+              <button 
+                className={`full-range-toggle ${isFullRange ? 'active' : ''}`}
+                onClick={() => setIsFullRange(!isFullRange)}
+              >
+                Full Range
+              </button>
+            )}
           </div>
 
           {currentPrice && (
@@ -414,7 +615,7 @@ export function AddLiquidity({ onBack, existingPosition }: AddLiquidityProps) {
             </div>
           )}
 
-          {!isFullRange && (
+          {!isManaging && !isFullRange && (
             <div className="price-inputs">
               <div className="price-input-group">
                 <label>Min Price</label>
@@ -441,49 +642,121 @@ export function AddLiquidity({ onBack, existingPosition }: AddLiquidityProps) {
             </div>
           )}
 
+          {isFullRange && (
+            <div className="full-range-warning">
+              ⚠️ Full range positions may earn less fees due to lower capital efficiency
+            </div>
+          )}
+
+          {isManaging && (
+            <div className="position-range" style={{ marginTop: 'var(--spacing-sm)' }}>
+              <div className="range-item">
+                <span className="range-label">Min Price</span>
+                <span className="range-value">{minPrice || '—'}</span>
+              </div>
+              <div className="range-arrow">↔</div>
+              <div className="range-item">
+                <span className="range-label">Max Price</span>
+                <span className="range-value">{maxPrice || '—'}</span>
+              </div>
+            </div>
+          )}
+
           {/* Position type indicator */}
           <div className={`position-type-indicator ${positionType}`}>
-            {positionType === 'in-range' && 'Price is in range'}
-            {positionType === 'above-range' && 'Price above range - Only ' + token0.symbol + ' required'}
-            {positionType === 'below-range' && 'Price below range - Only ' + token1.symbol + ' required'}
+            {positionType === 'in-range' && '✓ Price is in range - Both tokens required'}
+            {positionType === 'above-range' && '↑ Price above range - Only ' + token0.symbol + ' required (one-sided)'}
+            {positionType === 'below-range' && '↓ Price below range - Only ' + token1.symbol + ' required (one-sided)'}
             {positionType === 'full-range' && '∞ Full range position'}
             {positionType === 'invalid' && '⚠ Invalid price range'}
           </div>
         </div>
 
         {/* Token Amounts */}
-        <div className="amounts-section">
-          <label className="section-label">Deposit Amounts</label>
-          
-          <TokenInput
-            token={tokenA}
-            amount={amountA}
-            onAmountChange={setAmountA}
-            onTokenSelect={() => setSelectingToken('A')}
-            balance={balanceA as bigint | undefined}
-            label={tokenA.symbol}
-            showMax
-            disabled={positionType === 'below-range' && tokenA.address === token0.address || 
-                     positionType === 'above-range' && tokenA.address === token1.address}
-          />
+        {(!isManaging || manageTab === 'increase') && (
+          <div className="amounts-section">
+            <label className="section-label">{isManaging ? 'Add Amounts' : 'Deposit Amounts'}</label>
+            
+            <TokenInput
+              token={tokenA}
+              amount={amountA}
+              onAmountChange={setAmountA}
+              onTokenSelect={() => setSelectingToken('A')}
+              balance={balanceA as bigint | undefined}
+              label={tokenA.symbol}
+              showMax
+              disableTokenSelect={isManaging || isFixedPool}
+              disabled={positionType === 'below-range' && tokenA.address === token0.address || 
+                       positionType === 'above-range' && tokenA.address === token1.address}
+            />
 
-          <div className="amount-separator">+</div>
+            <div className="amount-separator">+</div>
 
-          <TokenInput
-            token={tokenB}
-            amount={amountB}
-            onAmountChange={setAmountB}
-            onTokenSelect={() => setSelectingToken('B')}
-            balance={balanceB as bigint | undefined}
-            label={tokenB.symbol}
-            showMax
-            disabled={positionType === 'below-range' && tokenB.address === token0.address ||
-                     positionType === 'above-range' && tokenB.address === token1.address}
-          />
-        </div>
+            <TokenInput
+              token={tokenB}
+              amount={amountB}
+              onAmountChange={setAmountB}
+              onTokenSelect={() => setSelectingToken('B')}
+              balance={balanceB as bigint | undefined}
+              label={tokenB.symbol}
+              showMax
+              disableTokenSelect={isManaging || isFixedPool}
+              disabled={positionType === 'below-range' && tokenB.address === token0.address ||
+                       positionType === 'above-range' && tokenB.address === token1.address}
+            />
+          </div>
+        )}
+
+        {isManaging && manageTab === 'remove' && (
+          <div className="amounts-section">
+            <label className="section-label">Remove Liquidity</label>
+
+            <div className="current-price" style={{ textAlign: 'left' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                <span>Current liquidity</span>
+                <strong>{positionLiquidity.toString()}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 6 }}>
+                <span>Remove</span>
+                <strong>{Math.max(0, Math.min(100, Math.floor(removePercent)))}%</strong>
+              </div>
+            </div>
+
+            <div className="price-input-group" style={{ marginTop: 'var(--spacing-sm)' }}>
+              <label>Percent to remove</label>
+              <input
+                type="number"
+                value={removePercent}
+                onChange={e => setRemovePercent(parseFloat(e.target.value) || 0)}
+                min="0"
+                max="100"
+                step="1"
+                className="price-input"
+              />
+              <span className="price-unit">%</span>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 'var(--spacing-sm)' }}>
+              {[25, 50, 75, 100].map(p => (
+                <button
+                  key={p}
+                  className={`slippage-option ${Math.floor(removePercent) === p ? 'active' : ''}`}
+                  type="button"
+                  onClick={() => setRemovePercent(p)}
+                >
+                  {p}%
+                </button>
+              ))}
+            </div>
+
+            <div className="position-type-indicator" style={{ marginTop: 'var(--spacing-sm)' }}>
+              You will receive the withdrawn tokens back into your wallet (decrease + collect).
+            </div>
+          </div>
+        )}
 
         {/* Pool status */}
-        {!poolExists && (
+        {!isManaging && !poolExists && (
           <div className="pool-create-notice">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="10" />
@@ -497,14 +770,14 @@ export function AddLiquidity({ onBack, existingPosition }: AddLiquidityProps) {
         <button
           className="add-liquidity-button"
           onClick={handleButtonClick}
-          disabled={isWriting || isConfirming || (positionType === 'invalid' && !isFullRange)}
+          disabled={isWriting || isConfirming || (!isManaging && positionType === 'invalid' && !isFullRange) || (isManaging && manageTab === 'remove' && (positionLiquidity <= 0n || liquidityToRemove <= 0n))}
         >
           {getButtonText()}
         </button>
       </div>
 
       <TokenSelectModal
-        isOpen={selectingToken !== null}
+        isOpen={!isManaging && !isFixedPool && selectingToken !== null}
         onClose={() => setSelectingToken(null)}
         onSelect={handleTokenSelect}
         excludeToken={selectingToken === 'A' ? tokenB : tokenA}

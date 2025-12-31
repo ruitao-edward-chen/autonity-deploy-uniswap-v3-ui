@@ -4,12 +4,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { wagmiConfig } from './config/wagmi'
 import { Header } from './components/Header'
 import { Swap } from './components/Swap'
-import { Pool } from './components/Pool'
+import { Liquidity } from './components/Pool'
 import './App.css'
 
 const queryClient = new QueryClient()
 
-type Tab = 'swap' | 'pool'
+type Tab = 'swap' | 'liquidity'
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState<Tab>('swap')
@@ -18,8 +18,8 @@ function AppContent() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.slice(1)
-      if (hash === 'pool') {
-        setActiveTab('pool')
+      if (hash === 'liquidity' || hash === 'pool') {
+        setActiveTab('liquidity')
       } else {
         setActiveTab('swap')
       }
@@ -45,19 +45,19 @@ function AppContent() {
             Swap
           </button>
           <button 
-            className={`tab-button ${activeTab === 'pool' ? 'active' : ''}`}
+            className={`tab-button ${activeTab === 'liquidity' ? 'active' : ''}`}
             onClick={() => {
-              setActiveTab('pool')
-              window.location.hash = 'pool'
+              setActiveTab('liquidity')
+              window.location.hash = 'liquidity'
             }}
           >
-            Pool
+            Liquidity
           </button>
         </nav>
 
         <div className="tab-content">
           {activeTab === 'swap' && <Swap />}
-          {activeTab === 'pool' && <Pool />}
+          {activeTab === 'liquidity' && <Liquidity />}
         </div>
       </main>
 
