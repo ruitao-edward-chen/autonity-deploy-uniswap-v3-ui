@@ -154,6 +154,8 @@ body {
   align-items: center;
   gap: var(--spacing-sm);
   color: var(--color-primary);
+  cursor: default;
+  user-select: none;
 }
 
 .logo-text {
