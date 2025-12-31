@@ -42,13 +42,22 @@ export function Liquidity() {
   const currentTick = fixedSlot0 ? Number(fixedSlot0[1]) : null
 
   // Get number of positions owned
-  const { data: positionCount } = useReadContract({
+  const { data: positionCount, refetch: refetchPositionCount } = useReadContract({
     address: CONTRACTS.nonfungiblePositionManager,
     abi: POSITION_MANAGER_ABI,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
     query: { enabled: !!address },
   })
+
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    await refetchPositionCount()
+    // Small delay to show the refresh animation
+    setTimeout(() => setIsRefreshing(false), 500)
+  }
 
   // Fetch position token IDs and details
   useEffect(() => {
@@ -257,15 +266,36 @@ export function Liquidity() {
       <div className="pool-card">
         <div className="pool-header">
           <h2>Liquidity (WATN / USDC)</h2>
-          <button 
-            className="pool-header-action-button"
-            onClick={() => {
-              setSelectedPosition(null)
-              setShowAddLiquidity(true)
-            }}
-          >
-            + Add
-          </button>
+          <div className="pool-header-actions">
+            <button 
+              className="refresh-button"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              title="Refresh positions"
+            >
+              <svg 
+                width="16" 
+                height="16" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2"
+                className={isRefreshing ? 'spinning' : ''}
+              >
+                <path d="M21 12a9 9 0 11-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+                <path d="M21 3v5h-5" />
+              </svg>
+            </button>
+            <button 
+              className="pool-add-button-header"
+              onClick={() => {
+                setSelectedPosition(null)
+                setShowAddLiquidity(true)
+              }}
+            >
+              + Add Liquidity
+            </button>
+          </div>
         </div>
 
         <div className="pool-list" style={{ marginBottom: 'var(--spacing-lg)' }}>
