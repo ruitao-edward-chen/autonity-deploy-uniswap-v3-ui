@@ -38,7 +38,7 @@ export function HomePage() {
     if (stored) return stored === 'dark'
     return false
   })
-  const animationRef = useRef<number>()
+  const animationRef = useRef<number | null>(null)
   
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light')
