@@ -638,6 +638,93 @@ body {
 }
 
 /* ============================================
+   Wallet Selection Modal
+   ============================================ */
+.wallet-modal {
+  max-width: 360px;
+}
+
+.wallet-list {
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.wallet-option {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  width: 100%;
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.wallet-option:hover {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-primary);
+}
+
+.wallet-option:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wallet-icon {
+  font-size: 1.5rem;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+}
+
+.wallet-name {
+  flex: 1;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--color-text-primary);
+}
+
+.wallet-tag {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  border-radius: var(--radius-full);
+  font-weight: 500;
+}
+
+.wallet-modal-footer {
+  padding: var(--spacing-md);
+  border-top: 1px solid var(--color-border);
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.wallet-modal-footer p {
+  margin-bottom: var(--spacing-xs);
+}
+
+.wallet-modal-footer a {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.wallet-modal-footer a:hover {
+  text-decoration: underline;
+}
+
+/* ============================================
    Pool Container
    ============================================ */
 .pool-container {

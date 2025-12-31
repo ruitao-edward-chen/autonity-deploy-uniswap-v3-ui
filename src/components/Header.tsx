@@ -1,11 +1,27 @@
+import { useState } from 'react'
 import { useAccount, useConnect, useDisconnect, useBalance } from 'wagmi'
 import { formatTokenBalance } from '../utils/tokens'
 
 export function Header() {
   const { address, isConnected } = useAccount()
-  const { connect, connectors } = useConnect()
+  const { connect, connectors, isPending } = useConnect()
   const { disconnect } = useDisconnect()
   const { data: balance } = useBalance({ address })
+  const [showWalletModal, setShowWalletModal] = useState(false)
+
+  const getConnectorIcon = (name: string) => {
+    const lowerName = name.toLowerCase()
+    if (lowerName.includes('metamask')) return '🦊'
+    if (lowerName.includes('coinbase')) return '🔵'
+    if (lowerName.includes('walletconnect')) return '🔗'
+    if (lowerName.includes('injected')) return '💉'
+    return '👛'
+  }
+
+  const getConnectorLabel = (name: string) => {
+    if (name.toLowerCase().includes('injected')) return 'Browser Wallet'
+    return name
+  }
 
   return (
     <header className="header">
@@ -36,13 +52,56 @@ export function Header() {
           ) : (
             <button 
               className="wallet-button"
-              onClick={() => connect({ connector: connectors[0] })}
+              onClick={() => setShowWalletModal(true)}
+              disabled={isPending}
             >
-              Connect Wallet
+              {isPending ? 'Connecting...' : 'Connect Wallet'}
             </button>
           )}
         </div>
       </div>
+
+      {/* Wallet Selection Modal */}
+      {showWalletModal && !isConnected && (
+        <div className="modal-overlay" onClick={() => setShowWalletModal(false)}>
+          <div className="modal-content wallet-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Connect Wallet</h3>
+              <button className="modal-close" onClick={() => setShowWalletModal(false)}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <div className="wallet-list">
+              {connectors.map((connector) => (
+                <button
+                  key={connector.uid}
+                  className="wallet-option"
+                  onClick={() => {
+                    connect({ connector })
+                    setShowWalletModal(false)
+                  }}
+                  disabled={isPending}
+                >
+                  <span className="wallet-icon">{getConnectorIcon(connector.name)}</span>
+                  <span className="wallet-name">{getConnectorLabel(connector.name)}</span>
+                  {connector.name.toLowerCase().includes('injected') && (
+                    <span className="wallet-tag">Detected</span>
+                  )}
+                </button>
+              ))}
+            </div>
+            <div className="wallet-modal-footer">
+              <p>New to Ethereum wallets?</p>
+              <a href="https://ethereum.org/wallets" target="_blank" rel="noopener noreferrer">
+                Learn more →
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   )
 }
