@@ -265,7 +265,7 @@ export function Liquidity() {
     <div className="pool-container">
       <div className="pool-card">
         <div className="pool-header">
-          <h2>Liquidity (WATN / USDC)</h2>
+          <h2>Liquidity</h2>
           <div className="pool-header-actions">
             <button 
               className="refresh-button"

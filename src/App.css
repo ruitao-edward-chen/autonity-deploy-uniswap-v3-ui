@@ -2003,16 +2003,120 @@ body {
 }
 
 /* ============================================
-   Responsive
+   Responsive - Tablet
+   ============================================ */
+@media (max-width: 768px) {
+  .main-content {
+    padding: var(--spacing-lg) var(--spacing-md);
+  }
+  
+  .tab-content {
+    max-width: 100%;
+  }
+  
+  .pool-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+  }
+  
+  .pool-header-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+/* ============================================
+   Responsive - Mobile
    ============================================ */
 @media (max-width: 640px) {
+  :root {
+    --spacing-lg: 20px;
+    --spacing-xl: 24px;
+    --spacing-2xl: 32px;
+  }
+
+  body {
+    font-size: 14px;
+  }
+
+  .header {
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+
   .header-content {
     flex-wrap: wrap;
-    gap: var(--spacing-md);
+    gap: var(--spacing-sm);
+  }
+  
+  .logo-text {
+    font-size: 1.1rem;
+  }
+
+  .wallet-button {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: 0.8125rem;
+  }
+
+  .wallet-connected {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--spacing-xs);
+  }
+
+  .balance {
+    font-size: 0.75rem;
   }
   
   .nav-links {
     display: none;
+  }
+  
+  .main-content {
+    padding: var(--spacing-md) var(--spacing-sm);
+  }
+
+  .tab-nav {
+    width: 100%;
+  }
+
+  .tab-button {
+    flex: 1;
+    padding: var(--spacing-sm);
+    font-size: 0.875rem;
+  }
+
+  .swap-card,
+  .pool-card,
+  .add-liquidity-card {
+    padding: var(--spacing-md);
+    border-radius: var(--radius-lg);
+  }
+
+  .swap-header h2,
+  .pool-header h2 {
+    font-size: 1rem;
+  }
+
+  .pool-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-sm);
+  }
+
+  .pool-header-actions {
+    justify-content: space-between;
+  }
+
+  .pool-add-button-header {
+    flex: 1;
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: 0.8125rem;
+  }
+
+  .refresh-button {
+    width: 40px;
+    height: 40px;
   }
   
   .fee-tier-options {
@@ -2022,10 +2126,201 @@ body {
   .price-inputs {
     grid-template-columns: 1fr;
   }
+
+  .amount-input {
+    font-size: 1.25rem;
+  }
+
+  .token-select-button {
+    padding: 4px 8px;
+    font-size: 0.8125rem;
+  }
+
+  .token-logo {
+    width: 20px;
+    height: 20px;
+  }
+
+  .swap-button,
+  .add-liquidity-button,
+  .pool-add-button {
+    padding: var(--spacing-md);
+    font-size: 1rem;
+  }
+
+  /* Pool card mobile */
+  .pool-price-display {
+    padding: var(--spacing-sm);
+  }
+
+  .price-value {
+    font-size: 1.5rem;
+  }
+
+  .composition-labels {
+    flex-direction: column;
+    gap: var(--spacing-xs);
+  }
+
+  .pool-stats {
+    grid-template-columns: 1fr;
+  }
+
+  /* Position cards mobile */
+  .position-card {
+    padding: var(--spacing-sm);
+  }
+
+  .position-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-xs);
+  }
+
+  .position-range {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    text-align: center;
+  }
+
+  .range-arrow {
+    transform: rotate(90deg);
+  }
+
+  /* Modal mobile */
+  .modal-overlay {
+    padding: var(--spacing-sm);
+    align-items: flex-end;
+  }
+
+  .modal-content {
+    max-width: 100%;
+    max-height: 85vh;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  }
+
+  .wallet-modal {
+    max-width: 100%;
+  }
+
+  .wallet-option {
+    padding: var(--spacing-md);
+  }
+
+  .wallet-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 1.25rem;
+  }
+
+  /* Depth chart mobile */
+  .depth-chart-container {
+    height: 100px;
+  }
+
+  .depth-chart-summary {
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    align-items: flex-start;
+  }
+
+  /* Price range visual mobile */
+  .liquidity-price-visual {
+    padding: var(--spacing-sm);
+  }
+
+  .price-scale {
+    height: 32px;
+  }
+
+  .price-range-visual {
+    padding: var(--spacing-sm);
+  }
+
+  .range-bar-container {
+    height: 20px;
+  }
   
   .footer-content {
     flex-direction: column;
     gap: var(--spacing-sm);
     text-align: center;
+  }
+}
+
+/* ============================================
+   Responsive - Small Mobile
+   ============================================ */
+@media (max-width: 380px) {
+  .header-content {
+    justify-content: center;
+  }
+
+  .logo {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .wallet-section {
+    width: 100%;
+  }
+
+  .wallet-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .tab-button {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: 0.8125rem;
+  }
+
+  .fee-tier-options {
+    grid-template-columns: 1fr;
+  }
+
+  .pool-header-actions {
+    flex-direction: column;
+    gap: var(--spacing-xs);
+  }
+
+  .pool-add-button-header {
+    width: 100%;
+  }
+
+  .refresh-button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ============================================
+   Touch-friendly improvements
+   ============================================ */
+@media (hover: none) and (pointer: coarse) {
+  /* Larger tap targets for touch devices */
+  .wallet-button,
+  .tab-button,
+  .fee-tier-option,
+  .slippage-option,
+  .wallet-option,
+  .manage-button,
+  .pool-add-button,
+  .swap-button {
+    min-height: 44px;
+  }
+
+  .token-select-button {
+    min-height: 40px;
+  }
+
+  .refresh-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Remove hover states that don't apply to touch */
+  .depth-bar:hover {
+    transform: none;
   }
 }
