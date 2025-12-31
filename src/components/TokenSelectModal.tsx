@@ -46,14 +46,20 @@ export function TokenSelectModal({
               className="token-list-item"
               onClick={() => handleSelect(token)}
             >
-              <div 
-                className="token-logo"
-                style={{ 
-                  backgroundColor: getTokenColor(token.symbol)
-                }}
-              >
-                {token.symbol[0]}
-              </div>
+              {token.logoURI ? (
+                <img 
+                  className="token-logo"
+                  src={token.logoURI}
+                  alt={token.symbol}
+                />
+              ) : (
+                <div 
+                  className="token-logo fallback"
+                  style={{ backgroundColor: getTokenColor(token.symbol) }}
+                >
+                  {token.symbol[0]}
+                </div>
+              )}
               <div className="token-info">
                 <span className="token-symbol">{token.symbol}</span>
                 <span className="token-name">{token.name}</span>

@@ -89,9 +89,17 @@ export function TokenInput({
 }
 
 function TokenLogo({ token }: { token: Token }) {
-  const getInitial = () => token.symbol[0]
+  if (token.logoURI) {
+    return (
+      <img 
+        className="token-logo"
+        src={token.logoURI}
+        alt={token.symbol}
+      />
+    )
+  }
   
-  // Use a colored circle with initial for now
+  // Fallback to colored circle with initial
   const colors: Record<string, string> = {
     'WATN': '#6366f1',
     'ATN': '#6366f1',
@@ -100,10 +108,10 @@ function TokenLogo({ token }: { token: Token }) {
   
   return (
     <div 
-      className="token-logo"
+      className="token-logo fallback"
       style={{ backgroundColor: colors[token.symbol] || '#888' }}
     >
-      {getInitial()}
+      {token.symbol[0]}
     </div>
   )
 }
