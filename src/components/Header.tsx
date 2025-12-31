@@ -82,7 +82,8 @@ export function Header() {
             >
               <svg className="chain-icon" width="20" height="20" viewBox="0 0 32 32" fill="none">
                 <circle cx="16" cy="16" r="14" fill="#1a1a2e" stroke="#4a4a6a" strokeWidth="2"/>
-                <path d="M16 6L22 16L16 26L10 16L16 6Z" fill="#00d4aa"/>
+                <text x="16" y="22" fontFamily="Arial, sans-serif" fontSize="16" fontWeight="bold" fill="#00d4aa" textAnchor="middle">α</text>
+                <line x1="8" y1="16" x2="24" y2="16" stroke="#00d4aa" strokeWidth="2"/>
               </svg>
               <span className="chain-name">Autonity</span>
               <svg className={`chain-chevron ${showChainDropdown ? 'rotated' : ''}`} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -97,7 +98,8 @@ export function Header() {
                   <button className="chain-option selected" onClick={() => setShowChainDropdown(false)}>
                     <svg className="chain-icon" width="24" height="24" viewBox="0 0 32 32" fill="none">
                       <circle cx="16" cy="16" r="14" fill="#1a1a2e" stroke="#4a4a6a" strokeWidth="2"/>
-                      <path d="M16 6L22 16L16 26L10 16L16 6Z" fill="#00d4aa"/>
+                      <text x="16" y="22" fontFamily="Arial, sans-serif" fontSize="16" fontWeight="bold" fill="#00d4aa" textAnchor="middle">α</text>
+                      <line x1="8" y1="16" x2="24" y2="16" stroke="#00d4aa" strokeWidth="2"/>
                     </svg>
                     <div className="chain-option-info">
                       <span className="chain-option-name">Autonity</span>
