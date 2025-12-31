@@ -28,7 +28,7 @@ export const TOKENS = {
   USDC: {
     address: '0xA13C67173822D9b11354a9404f221A3331FBd8C7' as const,
     symbol: 'USDC.pol',
-    name: 'USD Coin (Polygon Bridge)',
+    name: 'Bridged USDC (VIA Labs)',
     decimals: 6,
     logoURI: '/usdc.png',
   },

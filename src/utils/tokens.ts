@@ -20,7 +20,7 @@ export const DEFAULT_TOKENS: Token[] = [
   {
     address: TOKENS.USDC.address,
     symbol: 'USDC.pol',
-    name: 'USD Coin (Polygon Bridge)',
+    name: 'Bridged USDC (VIA Labs)',
     decimals: 6,
     logoURI: '/usdc.png',
   },
