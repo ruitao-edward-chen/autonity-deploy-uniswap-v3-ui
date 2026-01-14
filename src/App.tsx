@@ -140,6 +140,9 @@ function AutonityApp() {
             <a href="https://chainlist.org/?search=autonity" target="_blank" rel="noopener noreferrer">
               ChainList
             </a>
+            <a href="https://autonity.org/live-price" target="_blank" rel="noopener noreferrer">
+              Implied ATN Price
+            </a>
           </div>
         </div>
       </footer>
