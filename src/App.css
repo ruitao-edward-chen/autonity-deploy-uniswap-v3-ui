@@ -288,6 +288,41 @@ body {
   background: var(--color-bg-primary);
 }
 
+/* Wrong Chain State */
+.chain-selector.wrong-chain {
+  border-color: var(--color-warning);
+  background: #fff7ed;
+  color: #d97706;
+}
+
+.chain-selector.wrong-chain:hover {
+  background: #ffedd5;
+  border-color: #d97706;
+}
+
+.chain-selector.wrong-chain:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.chain-selector.wrong-chain .warning-icon {
+  color: #d97706;
+}
+
+[data-theme="dark"] .chain-selector.wrong-chain {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+[data-theme="dark"] .chain-selector.wrong-chain:hover {
+  background: rgba(245, 158, 11, 0.25);
+}
+
+[data-theme="dark"] .chain-selector.wrong-chain .warning-icon {
+  color: var(--color-warning);
+}
+
 .chain-dropdown-backdrop {
   position: fixed;
   top: 0;
@@ -2422,12 +2457,18 @@ body {
     justify-content: center;
   }
 
+  .chain-selector.wrong-chain {
+    width: auto;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-lg);
+  }
+
   .chain-selector .chain-icon {
     width: 24px;
     height: 24px;
   }
 
-  .chain-name {
+  .chain-selector:not(.wrong-chain) .chain-name {
     display: none;
   }
 

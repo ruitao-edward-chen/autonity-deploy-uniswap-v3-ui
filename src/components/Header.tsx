@@ -1,15 +1,19 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { useAccount, useConnect, useDisconnect, useBalance } from 'wagmi'
+import { useAccount, useConnect, useDisconnect, useBalance, useSwitchChain, useChainId } from 'wagmi'
 import { formatTokenBalance } from '../utils/tokens'
+import { CHAIN_ID } from '../config/chains'
 
 export function Header() {
   const { address, isConnected } = useAccount()
   const { connect, connectors, isPending } = useConnect()
   const { disconnect } = useDisconnect()
   const { data: balance } = useBalance({ address })
+  const chainId = useChainId()
+  const { switchChain, isPending: isSwitchingChain } = useSwitchChain()
   const [showWalletModal, setShowWalletModal] = useState(false)
   const [showChainDropdown, setShowChainDropdown] = useState(false)
+  const isWrongChain = isConnected && chainId !== CHAIN_ID
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const stored = localStorage.getItem('theme')
     if (stored) return stored === 'dark'
@@ -73,18 +77,33 @@ export function Header() {
 
           {/* Chain Selector */}
           <div className="chain-selector-wrapper">
-            <button 
-              className={`chain-selector ${showChainDropdown ? 'active' : ''}`}
-              onClick={() => setShowChainDropdown(!showChainDropdown)}
-            >
-              <img className="chain-icon" src="/autonity.png" alt="Autonity" width="20" height="20" />
-              <span className="chain-name">Autonity</span>
-              <svg className={`chain-chevron ${showChainDropdown ? 'rotated' : ''}`} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-            </button>
+            {isWrongChain ? (
+              <button 
+                className="chain-selector wrong-chain"
+                onClick={() => switchChain({ chainId: CHAIN_ID })}
+                disabled={isSwitchingChain}
+              >
+                <svg className="warning-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/>
+                  <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                <span className="chain-name">{isSwitchingChain ? 'Switching...' : 'Switch to Autonity'}</span>
+              </button>
+            ) : (
+              <button 
+                className={`chain-selector ${showChainDropdown ? 'active' : ''}`}
+                onClick={() => setShowChainDropdown(!showChainDropdown)}
+              >
+                <img className="chain-icon" src="/autonity.png" alt="Autonity" width="20" height="20" />
+                <span className="chain-name">Autonity</span>
+                <svg className={`chain-chevron ${showChainDropdown ? 'rotated' : ''}`} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </button>
+            )}
             
-            {showChainDropdown && (
+            {showChainDropdown && !isWrongChain && (
               <>
                 <div className="chain-dropdown-backdrop" onClick={() => setShowChainDropdown(false)} />
                 <div className="chain-dropdown">
