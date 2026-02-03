@@ -1,19 +1,19 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { useAccount, useConnect, useDisconnect, useBalance, useSwitchChain, useChainId } from 'wagmi'
+import { useAccount, useConnect, useDisconnect, useBalance, useSwitchChain } from 'wagmi'
 import { formatTokenBalance } from '../utils/tokens'
 import { CHAIN_ID } from '../config/chains'
 
 export function Header() {
-  const { address, isConnected } = useAccount()
+  const { address, isConnected, chain, chainId: walletChainId } = useAccount()
   const { connect, connectors, isPending } = useConnect()
   const { disconnect } = useDisconnect()
   const { data: balance } = useBalance({ address })
-  const chainId = useChainId()
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain()
   const [showWalletModal, setShowWalletModal] = useState(false)
   const [showChainDropdown, setShowChainDropdown] = useState(false)
-  const isWrongChain = isConnected && chainId !== CHAIN_ID
+  // Wrong chain if: connected AND (chain is undefined [unsupported] OR chainId doesn't match)
+  const isWrongChain = isConnected && (!chain || walletChainId !== CHAIN_ID)
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const stored = localStorage.getItem('theme')
     if (stored) return stored === 'dark'
